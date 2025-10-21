@@ -1,0 +1,49 @@
+"""inference"""
+
+import torch
+import tiktoken
+from model import Gemma3Model
+from config import GEMMA3_CONFIG_CUSTOM
+
+enc = tiktoken.get_encoding("gpt2")
+
+
+def generate(sentence, model, tokenizer, device, max_new_tokens=200):
+    context = torch.tensor(
+        tokenizer.encode_ordinary(sentence), device=device
+    ).unsqueeze(dim=0)
+
+    with torch.no_grad():
+        y = model.generate(context, max_new_tokens)
+
+    return tokenizer.decode(y.squeeze().tolist())
+
+
+if __name__ == "__main__":
+    torch.manual_seed(123)
+    model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    best_model_params_path = "./models/best_model_params_01.pt"
+    model.load_state_dict(
+        torch.load(
+            best_model_params_path, map_location=torch.device(device), weights_only=True
+        )
+    )
+
+    model.to(device)
+    model.eval()
+
+    test_sentences = [
+        "Once upon a time there was a pumpkin.",
+        "A little girl went to the woods",
+        "A boy told his sister a bedtime story about a flying cat",
+        "The kids sat in a circle while Uncle narrated a story about a brave knight",
+        "Dad was telling the kids an adventure tale about a pirate ship",
+    ]
+
+    for k, test_sentence in enumerate(test_sentences):
+        print(f"{k:2d}. input sentence: {test_sentence}")
+        generated = generate(test_sentence, model, enc, device, max_new_tokens=200)
+        print(generated)
+        print("-" * 64)
