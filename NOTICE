@@ -1,0 +1,5 @@
+Copyright 2023-2025 Sebastian Raschka
+
+This project is a derivative work of the original code found at https://github.com/rasbt/LLMs-from-scratch. The original code is licensed under the Apache License, Version 2.0.
+
+This derivative work is also licensed under the Apache License, Version 2.0. The code in this repository has been modified from the original for the purpose of creating a standalone project.

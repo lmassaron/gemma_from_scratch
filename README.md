@@ -98,3 +98,7 @@ Both scripts will output the generated text to the console.
 
 *   **Original Notebook:** [LLMs-from-scratch/ch05/12_gemma3/standalone-gemma3.ipynb](https://github.com/rasbt/LLMs-from-scratch/blob/main/ch05/12_gemma3/standalone-gemma3.ipynb) by Sebastian Raschka.
 *   **Hugging Face Model Card:** [google/gemma-3-270m](https://huggingface.co/google/gemma-3-270m)
+
+## License
+
+This project is licensed under the Apache 2.0 License. See the `LICENSE` file for more details.
