@@ -28,7 +28,7 @@ The most significant difference between the two repositories is their overall st
 
 ## Model Implementation
 
-The core implementation of the Gemma-style model is very similar in both repositories. They both correctly implement the key architectural features of Gemma 3.
+The core implementation of the Gemma-style model is very similar in both repositories. They both implement the key architectural features of Gemma 3.
 
 **Similarities:**
 - **Core Architecture:** Both models use the same fundamental components:
@@ -89,11 +89,9 @@ Both repositories use Python dictionaries to store the model's hyperparameters.
 **LLMs-from-scratch Notebook:**
 - **In-line Configuration:** The model configuration is defined in a dictionary within a code cell, directly before the model is initialized. This is suitable for a self-contained notebook but less scalable for a larger project with multiple models or experiments.
 
-## Conclusion
+## Summary
 
-In summary, both repositories provide excellent implementations of a Gemma-style model, but with different objectives:
+In summary, both repositories provide implementations of a Gemma-style model, but with different objectives:
 
 - **This repository** is structured as a reusable, modular project that is well-suited for training models from scratch and running experiments in a more traditional software development environment.
-- **The LLMs-from-scratch notebook** is a fantastic educational resource, designed to teach the concepts of the Gemma 3 architecture in a clear, linear, and interactive way.
-
-The choice between them would depend on the user's goal: to have a project to build upon, or to learn the inner workings of the model in a self-contained environment.
+- **The LLMs-from-scratch notebook** is an educational resource, designed to teach the concepts of the Gemma 3 architecture in a clear, linear, and interactive way.
