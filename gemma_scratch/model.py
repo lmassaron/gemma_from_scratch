@@ -5,9 +5,9 @@ from torch import nn
 import torch.nn.functional as F
 
 # Importing the custom building blocks of the transformer.
-from layers import TransformerBlock
-from normalization import RMSNorm
-from rope import compute_rope_params
+from gemma_scratch.layers import TransformerBlock
+from gemma_scratch.normalization import RMSNorm
+from gemma_scratch.rope import compute_rope_params
 
 
 class Gemma3Model(nn.Module):

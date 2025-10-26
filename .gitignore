@@ -1,10 +1,19 @@
-# Python-generated files
+# Python
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
 
-# Virtual environments
-.venv
+# IDE
+.vscode/
+.idea/
+
+# Data and Model Outputs
+/tinystories_data/
+/data/
+*.bin
+*.pt
+*.png

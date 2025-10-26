@@ -4,8 +4,8 @@ import torch
 from torch import nn
 
 # Importing the custom RMSNorm and RoPE implementations
-from normalization import RMSNorm
-from rope import apply_rope
+from gemma_scratch.normalization import RMSNorm
+from gemma_scratch.rope import apply_rope
 
 
 class GroupedQueryAttention(nn.Module):

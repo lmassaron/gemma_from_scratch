@@ -9,9 +9,9 @@ from datasets import load_dataset
 import matplotlib.pyplot as plt
 import torch
 from torch.optim.lr_scheduler import LinearLR, SequentialLR, CosineAnnealingLR
-from tokenizer import gpt2_tokenizer as enc
-from model import Gemma3Model
-from config import GEMMA3_CONFIG_CUSTOM
+from gemma_scratch.tokenizer import gpt2_tokenizer as enc
+from gemma_scratch.model import Gemma3Model
+from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
 def estimate_loss(model):
     # def estimate_loss(model, eval_iters, ctx)
