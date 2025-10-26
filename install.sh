@@ -4,7 +4,7 @@ PYTHON_VERSION="3.12"
 # Create the virtual environment
 uv venv "$VENV_NAME" --python "$PYTHON_VERSION" --seed
 
-uv pip install \
+uv pip install -U \
     --python "$VENV_NAME/bin/python" \
     'torch' --extra-index-url https://download.pytorch.org/whl/cu121 \
     'datasets' \
@@ -13,8 +13,10 @@ uv pip install \
     'safetensors' \
     'numpy' \
     'tqdm' \
+    'protobuf' \
     'tensorboard' \
     'matplotlib'
+
 
 echo "To activate the virtual environment, run:"
 echo "source $VENV_NAME/bin/activate"
