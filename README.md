@@ -1,45 +1,8 @@
-# Gemma 3 from Scratch
+# Gemma From Scratch
 
-This repository contains a from-scratch implementation of the Gemma 3 model, a family of lightweight, state-of-the-art open models from Google. This project is based on the original notebook by Sebastian Raschka, which can be found [here](https://github.com/rasbt/LLMs-from-scratch/blob/main/ch05/12_gemma3/standalone-gemma3.ipynb).
+This repository provides a clear and minimal implementation for training a Gemma-like language model from scratch using PyTorch. The project is structured to be easily understandable, with a clear separation between the core model logic and the training/data preparation scripts.
 
-## About this Project
-
-This project aims to provide a clear and understandable implementation of the Gemma 3 model, making it accessible for educational and research purposes. The code is structured into several files, each with a specific purpose, to facilitate a modular and organized understanding of the model's architecture and functionality.
-
-## Getting Started
-
-### Installation
-
-1.  **Clone the repository:**
-
-    ```bash
-    git clone https://github.com/your-username/gemma-3-from-scratch.git
-    cd gemma-3-from-scratch
-    ```
-
-2.  **Create a virtual environment and install the dependencies:**
-
-    This project uses `uv` to manage the virtual environment and dependencies.
-
-    ```bash
-    bash install.sh
-    ```
-
-    To activate the virtual environment, run:
-
-    ```bash
-    source .venv/bin/activate
-    ```
-
-### Running the Inference
-
-To run the inference with the pre-trained Gemma 3 270M model, you can use the `inference_google_gemma.py` script:
-
-```bash
-python inference_google_gemma.py
-```
-
-This script will download the model weights from the Hugging Face Hub, load them into the model, and generate text based on a set of predefined sentences.
+The implementation is heavily inspired by and builds upon the foundational work from Andrej Karpathy's [nanoGPT](https://github.com/karpathy/nanoGPT).
 
 ## Model Architecture
 
@@ -63,6 +26,104 @@ The final output of the transformer blocks is then passed through a normalizatio
 
 During inference, the model generates text autoregressively. It takes a starting sequence of tokens, predicts the next token, appends it to the sequence, and repeats the process until a specified number of new tokens have been generated.
 
+## Recommended Project Structure
+
+For better organization and modularity, it is highly recommended to arrange the project files as follows. This separates the user-facing scripts from the core, importable Python package.
+
+```
+gemma_from_scratch/
+├── .gitignore
+├── README.md
+├── requirements.txt
+│
+├── prepare_dataset.py      # User-facing script to download and process data
+├── train.py                # User-facing script to train the model
+│
+└── gemma_scratch/            # Core source code as a Python package
+    ├── __init__.py         # Makes 'gemma_scratch' a package
+    ├── config.py           # Model hyperparameters
+    ├── layers.py           # The TransformerBlock implementation
+    ├── model.py            # The Gemma model definition
+    ├── normalization.py    # RMSNorm implementation
+    ├── rope.py             # RoPE (Rotary Positional Embeddings) implementation
+    └── tokenizer.py        # Tokenizer utilities
+```
+*(To achieve this, simply create the `gemma_scratch` directory, move all `.py` files except `prepare_dataset.py` and `train.py` into it, and update the import statements as discussed.)*
+
+## Setup
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/lmassaron/gemma_from_scratch.git
+    cd gemma_from_scratch
+    ```
+
+2.  **Create a virtual environment and install dependencies:**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    pip install -r requirements.txt
+    ```
+
+## How to Use
+
+The process is divided into two main steps: data preparation and model training.
+
+### Step 1: Prepare the Dataset
+
+This script downloads a dataset from the Hugging Face Hub, tokenizes it using a GPT-2 tokenizer, and saves the token sequences into efficient binary files (`.bin`) for rapid loading during training.
+
+*   **To run with the default dataset (`roneneldan/TinyStories`):**
+    ```bash
+    python prepare_dataset.py
+    ```
+    This command will create a directory named `tinystories_data/` containing `train.bin` and `validation.bin`.
+
+*   **To use a different dataset from the Hub and a custom output directory:**
+    ```bash
+    python prepare_dataset.py <huggingface_dataset_name> --output_dir ./data
+    ```
+    For example: `python prepare_dataset.py "c4" --data_subset "en.noblocklist" --output_dir ./c4_data`
+
+### Step 2: Train the Model
+
+Once the dataset is prepared, you can start training the model. This script handles the entire training loop, including optimization, learning rate scheduling, and periodic evaluation.
+
+*   **To train using the default dataset location:**
+    *(This assumes you ran the default `prepare_dataset.py` command in the previous step)*
+    ```bash
+    python train.py
+    ```
+
+*   **To point the training script to a custom data directory:**
+    *(This is required if you used the `--output_dir` option when preparing the data)*
+    ```bash
+    python train.py --data_dir ./data
+    ```
+
+The training script will save the following outputs in the root directory:
+*   `best_model_params.pt`: The state dictionary of the model that achieved the lowest validation loss.
+*   `loss_plot.png`: A plot showing the training and validation loss curves over time.
+
+### Key Components & Logic
+
+*   **`prepare_dataset.py`**: A flexible data processing script. It parallelizes the tokenization step across all available CPU cores for maximum efficiency and uses memory-mapped NumPy arrays to handle datasets larger than RAM.
+
+*   **`train.py`**: The main training loop. It implements modern training best practices:
+    *   **Mixed-Precision Training:** Uses `torch.amp.autocast` with `bfloat16` for faster training and reduced memory usage on supported hardware.
+    *   **Optimizer:** Employs the AdamW optimizer, which adds weight decay for better regularization.
+    *   **Learning Rate Scheduler:** Uses a `SequentialLR` scheduler that combines a linear warmup phase with a cosine annealing decay, helping to stabilize training.
+    *   **Gradient Accumulation:** Allows for training with large effective batch sizes even on memory-constrained GPUs.
+    *   **Gradient Clipping:** Prevents exploding gradients by clipping the norm of the gradients before the optimizer step.
+
+*   **`gemma_scratch/` (The Core Package):**
+    *   `model.py`: Defines the `Gemma3Model` class, a PyTorch `nn.Module` that assembles the complete transformer architecture.
+    *   `layers.py`: Contains the `TransformerBlock`, the core repeating unit of the model, which includes multi-head attention and the MLP layers.
+    *   `rope.py`: Implements **Rotary Positional Embeddings (RoPE)**, a modern technique for injecting positional information into the self-attention mechanism.
+    *   `normalization.py`: Provides an efficient `RMSNorm` (Root Mean Square Normalization) layer, which is used throughout the Gemma architecture instead of traditional LayerNorm.
+    *   `config.py`: A simple file to store the model's hyperparameters (e.g., number of layers, heads, embedding dimensions).
+    *   `tokenizer.py`: A wrapper for the GPT-2 tokenizer used for encoding the text data.
+
 ## Usage
 
 This repository provides two main scripts for running inference:
@@ -80,19 +141,6 @@ This repository provides two main scripts for running inference:
     ```
 
 Both scripts will output the generated text to the console.
-
-## Files
-
-*   **`config.py`**: Contains the configurations for the Gemma 3 model, including `GEMMA3_CONFIG_CUSTOM` and `GEMMA3_CONFIG_270M`.
-*   **`model.py`**: Defines the Gemma 3 model architecture, including the `Gemma3Model` class and the function to load pre-trained weights.
-*   **`layers.py`**: Contains the building blocks of the transformer model, such as the `TransformerBlock` and `Attention` classes.
-*   **`normalization.py`**: Implements the `RMSNorm` layer.
-*   **`rope.py`**: Contains the functions for computing the Rotary Positional Embeddings (RoPE).
-*   **`tokenizer.py`**: A simple tokenizer for the Gemma 3 model.
-*   **`inference_google_gemma.py`**: A script for running inference with the pre-trained Gemma 3 270M model from the Hugging Face Hub.
-*   **`inference_custom.py`**: A script for running inference with a custom model.
-*   **`train_from_scratch.py`**: A script for training the Gemma 3 model from scratch (this is a placeholder and not fully implemented).
-*   **`install.sh`**: A bash script to create a virtual environment and install the required dependencies.
 
 ## References
 
