@@ -21,14 +21,15 @@ def generate(sentence, model, tokenizer, device, max_new_tokens=200):
 
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description="Generate text using a trained Gemma model.")
+    parser = argparse.ArgumentParser(
+        description="Generate text using a trained Gemma model."
+    )
     parser.add_argument(
         "model_path",
         nargs="?",
         type=str,
         default="./models/best_model_params_01.pt",
-        help="Path to the saved model parameters (.pt file). Defaults to './models/best_model_params_01.pt'."
+        help="Path to the saved model parameters (.pt file). Defaults to './models/best_model_params_01.pt'.",
     )
     args = parser.parse_args()
 
