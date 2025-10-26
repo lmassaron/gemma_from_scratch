@@ -5,27 +5,40 @@ import argparse
 from contextlib import nullcontext
 import numpy as np
 from tqdm.auto import tqdm
-from datasets import load_dataset
 import matplotlib.pyplot as plt
 import torch
 from torch.optim.lr_scheduler import LinearLR, SequentialLR, CosineAnnealingLR
-from gemma_scratch.tokenizer import gpt2_tokenizer as enc
+from torch.utils.tensorboard import SummaryWriter
 from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
-def estimate_loss(model):
-    # def estimate_loss(model, eval_iters, ctx)
+
+def evaluate_model(model, split):
+    """Calculates loss, perplexity, and accuracy for a given split."""
     out = {}
     model.eval()
     with torch.inference_mode():
-        for split in ["train", "val"]:
-            losses = torch.zeros(eval_iters)
-            for k in range(eval_iters):
-                X, Y = get_batch(split)
-                with ctx:
-                    logits, loss = model(X, Y)
-                losses[k] = loss.item()
-            out[split] = losses.mean()
+        losses = torch.zeros(eval_iters)
+        correct_predictions = 0
+        total_predictions = 0
+
+        for k in range(eval_iters):
+            X, Y = get_batch(split)
+            with ctx:
+                logits, loss = model(X, Y)
+
+            losses[k] = loss.item()
+
+            # Calculate accuracy
+            preds = torch.argmax(logits, dim=-1)
+            correct_predictions += (preds == Y).sum().item()
+            total_predictions += Y.numel()  # numel gets the total number of elements
+
+        out[f"{split}_loss"] = losses.mean()
+        # Calculate perplexity from the mean loss
+        out[f"{split}_perplexity"] = torch.exp(out[f"{split}_loss"])
+        out[f"{split}_accuracy"] = correct_predictions / total_predictions
+
     model.train()
     return out
 
@@ -65,12 +78,17 @@ def get_batch(split):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="Train a model.")
-    parser.add_argument("--data_dir", type=str, default="./tinystories_data", help="The directory containing train.bin and validation.bin.")
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        default="./tinystories_data",
+        help="The directory containing train.bin and validation.bin.",
+    )
     args = parser.parse_args()
 
     data_dir = args.data_dir
+    writer = SummaryWriter()
 
     torch.manual_seed(123)
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
@@ -161,25 +179,47 @@ if __name__ == "__main__":
         if ((iter_num + 1) % gradient_accumulation_steps == 0) or (
             iter_num + 1 == max_iters
         ):
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+            writer.add_scalar("Train/gradient_norm", grad_norm, iter_num)
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad(set_to_none=True)
             scheduler.step()
 
-        if iter_num % eval_iters == 0 and iter_num != 0:
-            losses = estimate_loss(model)
-            print(
-                f"Iteration {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
-            )
-            # Now, this will report the learning rate as it's being updated by the scheduler
-            print(f"The current learning rate: {optimizer.param_groups[0]['lr']:.5f}")
-            train_loss_list.append(losses["train"].detach().cpu())
-            validation_loss_list.append(losses["val"].detach().cpu())
+        writer.add_scalar(
+            "Train/learning_rate", optimizer.param_groups[0]["lr"], iter_num
+        )
 
-            if losses["val"] < best_val_loss:
-                best_val_loss = losses["val"]
+        if iter_num % eval_iters == 0 and iter_num != 0:
+            train_metrics = evaluate_model(model, "train")
+            val_metrics = evaluate_model(model, "val")
+
+            print(
+                f"Iteration {iter_num}: "
+                f"train loss {train_metrics['train_loss']:.4f}, "
+                f"val loss {val_metrics['val_loss']:.4f}, "
+                f"val perplexity {val_metrics['val_perplexity']:.4f}, "
+                f"val accuracy {val_metrics['val_accuracy']:.4f}"
+            )
+
+            # 7. Log all metrics to TensorBoard
+            writer.add_scalar("Loss/train", train_metrics["train_loss"], iter_num)
+            writer.add_scalar("Loss/validation", val_metrics["val_loss"], iter_num)
+            writer.add_scalar(
+                "Perplexity/validation", val_metrics["val_perplexity"], iter_num
+            )
+            writer.add_scalar(
+                "Accuracy/validation", val_metrics["val_accuracy"], iter_num
+            )
+
+            train_loss_list.append(train_metrics["train_loss"])
+            validation_loss_list.append(val_metrics["val_loss"])
+
+            if val_metrics["val_loss"] < best_val_loss:
+                best_val_loss = val_metrics["val_loss"]
                 torch.save(model.state_dict(), best_model_params_path)
+
+    writer.close()
 
     plt.plot(train_loss_list, "g", label="train_loss")
     plt.plot(validation_loss_list, "r", label="validation_loss")
