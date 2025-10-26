@@ -2,6 +2,7 @@
 
 import torch
 import tiktoken
+import argparse
 from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
@@ -20,14 +21,25 @@ def generate(sentence, model, tokenizer, device, max_new_tokens=200):
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Generate text using a trained Gemma model.")
+    parser.add_argument(
+        "model_path",
+        nargs="?",
+        type=str,
+        default="./models/best_model_params_01.pt",
+        help="Path to the saved model parameters (.pt file). Defaults to './models/best_model_params_01.pt'."
+    )
+    args = parser.parse_args()
+
     torch.manual_seed(123)
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    best_model_params_path = "./models/best_model_params_01.pt"
+    model_params_path = args.model_path
     model.load_state_dict(
         torch.load(
-            best_model_params_path, map_location=torch.device(device), weights_only=True
+            model_params_path, map_location=torch.device(device), weights_only=True
         )
     )
 
