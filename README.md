@@ -26,9 +26,9 @@ The final output of the transformer blocks is then passed through a normalizatio
 
 During inference, the model generates text autoregressively. It takes a starting sequence of tokens, predicts the next token, appends it to the sequence, and repeats the process until a specified number of new tokens have been generated.
 
-## Recommended Project Structure
+## Project Structure
 
-For better organization and modularity, it is highly recommended to arrange the project files as follows. This separates the user-facing scripts from the core, importable Python package.
+For better organization and modularity, the project files have been arranged as follows. This separates the user-facing scripts from the core, importable Python package.
 
 ```
 gemma_from_scratch/
@@ -48,7 +48,6 @@ gemma_from_scratch/
     ├── rope.py             # RoPE (Rotary Positional Embeddings) implementation
     └── tokenizer.py        # Tokenizer utilities
 ```
-*(To achieve this, simply create the `gemma_scratch` directory, move all `.py` files except `prepare_dataset.py` and `train.py` into it, and update the import statements as discussed.)*
 
 ## Setup
 
