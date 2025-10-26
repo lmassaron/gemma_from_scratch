@@ -46,9 +46,9 @@ class GroupedQueryAttention(nn.Module):
         """
         super().__init__()
         # Ensure that the number of query heads is a multiple of the number of K/V groups.
-        assert (
-            num_heads % num_kv_groups == 0
-        ), "num_heads must be divisible by num_kv_groups"
+        assert num_heads % num_kv_groups == 0, (
+            "num_heads must be divisible by num_kv_groups"
+        )
 
         self.num_heads = num_heads
         self.num_kv_groups = num_kv_groups
@@ -57,9 +57,9 @@ class GroupedQueryAttention(nn.Module):
 
         # Determine the dimension of each head if not explicitly provided.
         if head_dim is None:
-            assert (
-                d_in % num_heads == 0
-            ), "`d_in` must be divisible by `num_heads` if `head_dim` is not set"
+            assert d_in % num_heads == 0, (
+                "`d_in` must be divisible by `num_heads` if `head_dim` is not set"
+            )
             head_dim = d_in // num_heads
 
         self.head_dim = head_dim

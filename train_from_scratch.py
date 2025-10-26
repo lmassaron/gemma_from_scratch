@@ -1,6 +1,7 @@
 """Gemma from scratch"""
 
 import os
+import argparse
 from contextlib import nullcontext
 import numpy as np
 from tqdm.auto import tqdm
@@ -11,45 +12,6 @@ from torch.optim.lr_scheduler import LinearLR, SequentialLR, CosineAnnealingLR
 from tokenizer import gpt2_tokenizer as enc
 from model import Gemma3Model
 from config import GEMMA3_CONFIG_CUSTOM
-
-
-def process(example):
-    """encoding text"""
-    ids = enc.encode_ordinary(
-        example["text"]
-    )  # encode_ordinary ignores any special tokens
-    out = {"ids": ids, "len": len(ids)}
-    return out
-
-
-def prepare_data(data):
-    """preparing a large text dataset for machine learning model training"""
-    if not os.path.exists("train.bin"):
-        tokenized = data.map(
-            process,
-            remove_columns=["text"],
-            desc="tokenizing the splits",
-            num_proc=os.cpu_count(),
-        )
-        # concatenate all the ids in each dataset into one large file we can use for training
-        for split, dset in tokenized.items():
-            arr_len = np.sum(dset["len"], dtype=np.uint64)
-            filename = f"{split}.bin"
-            dtype = np.uint16  # (can do since enc.max_token_value == 50256 is < 2**16)
-            arr = np.memmap(filename, dtype=dtype, mode="w+", shape=(arr_len,))
-            total_batches = 1024
-            idx = 0
-            for batch_idx in tqdm(range(total_batches), desc=f"writing {filename}"):
-                # Batch together samples for faster write
-                batch = dset.shard(
-                    num_shards=total_batches, index=batch_idx, contiguous=True
-                )  # .with_format('numpy')
-                arr_batch = np.concatenate(batch["ids"])
-                # Write into mmap
-                arr[idx : idx + len(arr_batch)] = arr_batch
-                idx += len(arr_batch)
-            arr.flush()
-
 
 def estimate_loss(model):
     # def estimate_loss(model, eval_iters, ctx)
@@ -76,9 +38,11 @@ def get_batch(split):
     # We recreate np.memmap every batch to avoid a memory leak, as per
     # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
     if split == "train":
-        data = np.memmap("train.bin", dtype=np.uint16, mode="r")
+        file_path = os.path.join(data_dir, "train.bin")
+        data = np.memmap(file_path, dtype=np.uint16, mode="r")
     else:
-        data = np.memmap("validation.bin", dtype=np.uint16, mode="r")
+        file_path = os.path.join(data_dir, "validation.bin")
+        data = np.memmap(file_path, dtype=np.uint16, mode="r")
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack(
         [torch.from_numpy((data[i : i + block_size]).astype(np.int64)) for i in ix]
@@ -101,8 +65,12 @@ def get_batch(split):
 
 
 if __name__ == "__main__":
-    ds = load_dataset("roneneldan/TinyStories")
-    prepare_data(ds)
+
+    parser = argparse.ArgumentParser(description="Train a model.")
+    parser.add_argument("--data_dir", type=str, default="./tinystories_data", help="The directory containing train.bin and validation.bin.")
+    args = parser.parse_args()
+
+    data_dir = args.data_dir
 
     torch.manual_seed(123)
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
