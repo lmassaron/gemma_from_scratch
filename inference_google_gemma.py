@@ -5,9 +5,9 @@ import torch
 import torch.nn.functional as F
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
-from model import Gemma3Model, load_weights_into_gemma
-from config import GEMMA3_CONFIG_270M
-from tokenizer import gemma_tokenizer
+from gemma_scratch.model import Gemma3Model, load_weights_into_gemma
+from gemma_scratch.config import GEMMA3_CONFIG_270M
+from gemma_scratch.tokenizer import gemma_tokenizer
 
 
 def stream_next_token(

@@ -2,8 +2,8 @@
 
 import torch
 import tiktoken
-from model import Gemma3Model
-from config import GEMMA3_CONFIG_CUSTOM
+from gemma_scratch.model import Gemma3Model
+from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
 enc = tiktoken.get_encoding("gpt2")
 
