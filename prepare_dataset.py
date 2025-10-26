@@ -5,12 +5,14 @@ from tqdm.auto import tqdm
 from datasets import load_dataset
 from gemma_scratch.tokenizer import gpt2_tokenizer as enc
 
+
 def process(example):
     """Encoding text."""
     # Encode ordinary ignores any special tokens
     ids = enc.encode_ordinary(example["text"])
     out = {"ids": ids, "len": len(ids)}
     return out
+
 
 def prepare_data(dataset_name, output_dir="."):
     """
@@ -34,7 +36,7 @@ def prepare_data(dataset_name, output_dir="."):
             process,
             remove_columns=["text"],
             desc="tokenizing the splits",
-            num_proc=os.cpu_count(), # returns the number of available CPUs for tokenization on multiple cores
+            num_proc=os.cpu_count(),  # returns the number of available CPUs for tokenization on multiple cores
         )
         # Concatenate all the ids in each dataset into one large file we can use for training
         for split, dset in tokenized.items():
@@ -44,7 +46,7 @@ def prepare_data(dataset_name, output_dir="."):
             # (can do since enc.max_token_value == 50256 is < 2**16)
             dtype = np.uint16
             arr = np.memmap(filename, dtype=dtype, mode="w+", shape=(arr_len,))
-            total_batches = 1024 # a hardcoded number that controls the granularity of the writing process
+            total_batches = 1024  # a hardcoded number that controls the granularity of the writing process
             # Caveaty: for very large datasets (e.g., hundreds of GB), each of the 1024 shards could be very large, potentially causing memory issues.
             idx = 0
             for batch_idx in tqdm(range(total_batches), desc=f"writing {filename}"):
@@ -60,9 +62,21 @@ def prepare_data(dataset_name, output_dir="."):
                 idx += len(arr_batch)
             arr.flush()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare a dataset for training.")
-    parser.add_argument("dataset_name", nargs="?", type=str, default="roneneldan/TinyStories", help="The name of the dataset to load from the Hugging Face Hub.")
-    parser.add_argument("--output_dir", type=str, default="./tinystories_data", help="The directory to save the output files.")
+    parser.add_argument(
+        "dataset_name",
+        nargs="?",
+        type=str,
+        default="roneneldan/TinyStories",
+        help="The name of the dataset to load from the Hugging Face Hub.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="./tinystories_data",
+        help="The directory to save the output files.",
+    )
     args = parser.parse_args()
     prepare_data(args.dataset_name, args.output_dir)
