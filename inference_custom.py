@@ -36,7 +36,16 @@ if __name__ == "__main__":
     torch.manual_seed(123)
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Set the device (mps for Apple Silicon, cuda for NVIDIA, cpu as fallback)
+    if torch.backends.mps.is_available():
+        device = "mps"
+    elif torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+    
+    print(f"Using device: {device}")
+
     model_params_path = args.model_path
     model.load_state_dict(
         torch.load(

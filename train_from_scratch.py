@@ -99,24 +99,40 @@ def main(args):
 
     torch.manual_seed(123)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    device_type = "cuda" if "cuda" in device else "cpu"
+    # Set the device (mps for Apple Silicon, cuda for NVIDIA, cpu as fallback)
+    if torch.backends.mps.is_available():
+        device = "mps"
+    elif torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+    
+    device_type = "cuda" if device == "cuda" else "cpu"
 
-    dtype = (
-        "bfloat16"
-        if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
-        else "float16"
-    )
+    print(f"Using device: {device}")
+
+    if device in ['cuda', 'mps'] and torch.cuda.is_bf16_supported():
+         # On CUDA, check for bfloat16 support. MPS always supports it.
+        dtype = 'bfloat16'
+    elif device == 'cuda': # Fallback for older NVIDIA GPUs
+        dtype = 'float16'
+    else: # CPU
+        dtype = 'bfloat16' # bfloat16 is also good on modern CPUs
+
     ptdtype = {
         "float32": torch.float32,
         "bfloat16": torch.bfloat16,
         "float16": torch.float16,
     }[dtype]
+    
     ctx = (
         nullcontext()
         if device_type == "cpu"
         else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
     )
+
+    # Enabled for float16, bfloat16 doesn't need it.
+    scaler = torch.amp.GradScaler(enabled=(dtype == "float16"))
 
     # --- Model and Optimizer ---
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
@@ -145,7 +161,6 @@ def main(args):
         milestones=[args.warmup_steps],
     )
 
-    scaler = torch.amp.GradScaler(device="cuda", enabled=(dtype == "float16"))
     best_val_loss = float("inf")
 
     # --- Training Loop ---
@@ -232,7 +247,6 @@ def main(args):
     plt.legend()
     plt.savefig(f"{timestamp}_loss_plot.png")
     plt.close()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

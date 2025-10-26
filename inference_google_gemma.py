@@ -94,7 +94,15 @@ if __name__ == "__main__":
     )
     weights_dict = load_file(weights_file)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Set the device (mps for Apple Silicon, cuda for NVIDIA, cpu as fallback)
+    if torch.backends.mps.is_available():
+        device = "mps"
+    elif torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+    
+    print(f"Using device: {device}")
 
     load_weights_into_gemma(model, GEMMA3_CONFIG_270M, weights_dict)
     model.to(device)
