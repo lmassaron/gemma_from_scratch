@@ -1,0 +1,9 @@
+datasets
+tiktoken
+tokenizers
+safetensors
+numpy
+tqdm
+protobuf
+tensorboard
+matplotlib
