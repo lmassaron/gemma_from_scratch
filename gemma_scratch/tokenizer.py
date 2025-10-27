@@ -85,6 +85,7 @@ def apply_chat_template(user_text: str) -> str:
 def download_tokenizer_if_needed(repo_id: str, local_dir: Path) -> Path:
     """
     Downloads the tokenizer file from Hugging Face Hub if it doesn't exist locally.
+    In case you have no permission to load it, it falls back to 
 
     Args:
         repo_id (str): The Hugging Face repository ID to download from.
@@ -105,6 +106,17 @@ def download_tokenizer_if_needed(repo_id: str, local_dir: Path) -> Path:
             print("Download complete.")
         except (IOError, ValueError) as e:
             print(f"Warning: Failed to download tokenizer.json: {e}", file=sys.stderr)
+            print(f"Attemping to load it from a fallback repository")
+            try:
+                hf_hub_download(
+                    repo_id="lmassaron/gemma-3-4b-finsentiment",
+                    filename=TOKENIZER_FILE,
+                    local_dir=local_dir,
+                )
+                print("Download complete.")
+            except (IOError, ValueError) as e:
+                print(f"Warning: Failed to download tokenizer.json: {e}", file=sys.stderr)
+
     return tokenizer_path
 
 
