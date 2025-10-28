@@ -40,6 +40,13 @@ class GemmaTokenizer:
         self.eos_token_id = self._tok.token_to_id(EOS_TOKEN)
         self.pad_token_id = self.eos_token_id
 
+    @property
+    def vocab_size(self) -> int:
+        """
+        Returns the total number of unique tokens in the vocabulary.
+        """
+        return self._tok.get_vocab_size()
+
     def encode(self, text: str) -> list[int]:
         """
         Encodes a string of text into a list of token IDs.
@@ -108,8 +115,9 @@ def download_tokenizer_if_needed(repo_id: str, local_dir: Path) -> Path:
             print(f"Warning: Failed to download tokenizer.json: {e}", file=sys.stderr)
             print(f"Attemping to load it from a fallback repository")
             try:
+                fallback_repo_id = "lmassaron/gemma-3-4b-finsentiment"
                 hf_hub_download(
-                    repo_id="lmassaron/gemma-3-4b-finsentiment",
+                    repo_id=fallback_repo_id,
                     filename=TOKENIZER_FILE,
                     local_dir=local_dir,
                 )
@@ -119,10 +127,50 @@ def download_tokenizer_if_needed(repo_id: str, local_dir: Path) -> Path:
 
     return tokenizer_path
 
+def get_gemma_tokenizer():
+    tokenizer_file = download_tokenizer_if_needed(REPO_ID, LOCAL_DIR)
+    gemma_tokenizer = GemmaTokenizer(tokenizer_file_path=tokenizer_file)
+    return gemma_tokenizer
 
-tokenizer_file = download_tokenizer_if_needed(REPO_ID, LOCAL_DIR)
-gemma_tokenizer = GemmaTokenizer(tokenizer_file_path=tokenizer_file)
-gpt2_tokenizer = tiktoken.get_encoding("gpt2")
+def get_gpt2_tokenizer():
+    gpt2_tokenizer = tiktoken.get_encoding("gpt2")
+    return gpt2_tokenizer
 
 if __name__ == "__main__":
-    pass
+
+    # Instantiating a tokenizer class with the downloaded Gemma tokenizer.
+    gemma_tokenizer = get_gemma_tokenizer()
+
+    # Defining a sample message from a user.
+    user_message = "What is the purpose of a tokenizer?"
+
+    # Applying the model-specific chat template.
+    # This formats the input correctly for the model to understand it's a user prompt.
+    formatted_prompt = apply_chat_template(user_message)
+    
+    print("--- Chat Template ---")
+    print(f"Original message: '{user_message}'")
+    print(f"Formatted for model:\n'{formatted_prompt}'")
+    print("-" * 25)
+
+    # Encoding the formatted prompt into token IDs.
+    encoded_ids = gemma_tokenizer.encode(formatted_prompt)
+
+    print("--- Encoding ---")
+    print(f"Vocabulary size: {gemma_tokenizer.vocab_size} tokens")
+    print(f"Encoded token IDs: {encoded_ids}")
+    print("-" * 25)
+
+    # Decoding the token IDs back into text to verify.
+    decoded_text = gemma_tokenizer.decode(encoded_ids)
+
+    print("--- Decoding ---")
+    print(f"Decoded text: '{decoded_text}'")
+    print("-" * 25)
+
+    # Comparing with another tokenizer like GPT-2's.
+    print("--- Comparison with GPT-2 Tokenizer ---")
+    gpt2_tokenizer = tiktoken.get_encoding("gpt2")
+    gpt2_encoded = gpt2_tokenizer.encode(user_message)
+    print(f"Same message encoded with GPT-2: {gpt2_encoded}")
+    print("Notice how the token IDs and the length of the list can be different")

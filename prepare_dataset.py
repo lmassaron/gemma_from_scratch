@@ -3,8 +3,9 @@ import argparse
 import numpy as np
 from tqdm.auto import tqdm
 from datasets import load_dataset
-from gemma_scratch.tokenizer import gpt2_tokenizer as enc
+from gemma_scratch.tokenizer import get_gpt2_tokenizer
 
+enc = get_gpt2_tokenizer()
 
 def process(example):
     """Encoding text."""
