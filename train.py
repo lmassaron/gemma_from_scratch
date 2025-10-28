@@ -15,7 +15,7 @@ from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
 
 def evaluate_model(
-    model, eval_iters, ctx, data_dir, block_size, batch_size, device_type, device
+    model, eval_iters, ctx, data_dir, sequence_length, batch_size, device_type, device
 ):
     """Calculates loss, perplexity, and accuracy for train and validation splits."""
     metrics = {}
@@ -28,7 +28,7 @@ def evaluate_model(
 
             for k in range(eval_iters):
                 X, Y = get_batch(
-                    split, data_dir, block_size, batch_size, device_type, device
+                    split, data_dir, sequence_length, batch_size, device_type, device
                 )
                 with ctx:
                     logits, loss = model(X, Y)
@@ -175,7 +175,7 @@ def main(args):
             X, y = get_batch(
                 "train",
                 args.data_dir,
-                args.block_size,
+                args.sequence_length,
                 args.batch_size,
                 device_type,
                 device,
@@ -214,7 +214,7 @@ def main(args):
                 args.eval_iters,
                 ctx,
                 args.data_dir,
-                args.block_size,
+                args.sequence_length,
                 args.batch_size,
                 device_type,
                 device,
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     # Model and data parameters
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size.")
     parser.add_argument(
-        "--block_size", type=int, default=128, help="Context length (block size)."
+        "--sequence_length", type=int, default=128, help="Context window length (block size)."
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
@@ -309,10 +309,10 @@ if __name__ == "__main__":
         train_data_path = os.path.join(args.data_dir, "train.bin")
         train_data = np.memmap(train_data_path, dtype=np.uint16, mode='r')
         num_tokens = len(train_data)
-        num_possible_sequences = num_tokens - args.block_size
+        num_possible_sequences = num_tokens - args.sequence_length
         iters_for_one_epoch = num_possible_sequences // args.batch_size
         print(f"  Training data has {num_tokens:,} tokens.")
-        print(f"  Number of possible sequences of length {args.block_size}: {num_possible_sequences:,}")
+        print(f"  Number of possible sequences of length {args.sequence_length}: {num_possible_sequences:,}")
         print(f"  With a batch size of {args.batch_size}, one epoch is approx. {iters_for_one_epoch:,} iterations.")
         args.max_iters = iters_for_one_epoch
 
