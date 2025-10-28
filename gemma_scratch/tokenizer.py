@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
     # Comparing with another tokenizer like GPT-2's.
     print("--- Comparison with GPT-2 Tokenizer ---")
-    gpt2_tokenizer = tiktoken.get_encoding("gpt2")
+    gpt2_tokenizer = get_gpt2_tokenizer()
     gpt2_encoded = gpt2_tokenizer.encode(user_message)
     print(f"Same message encoded with GPT-2: {gpt2_encoded}")
     print("Notice how the token IDs and the length of the list can be different")
