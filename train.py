@@ -61,8 +61,10 @@ def get_batch(split, data_dir, sequence_length, batch_size, device_type, device)
     data = np.memmap(file_path, dtype=np.uint16, mode="r")
 
     ix = torch.randint(len(data) - sequence_length, (batch_size,))
-    x = torch.from_numpy(np.array([data[i:i + sequence_length] for i in ix])).long()
-    y = torch.from_numpy(np.array([data[i + 1:i + 1 + sequence_length] for i in ix])).long()
+    x = torch.from_numpy(np.array([data[i : i + sequence_length] for i in ix])).long()
+    y = torch.from_numpy(
+        np.array([data[i + 1 : i + 1 + sequence_length] for i in ix])
+    ).long()
 
     if device_type == "cuda":
         # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
@@ -92,24 +94,17 @@ def main(args):
     torch.manual_seed(123)
 
     # Set the device (mps for Apple Silicon, cuda for NVIDIA, cpu as fallback)
+    # bfloat16 is good on modern CPUs and GPUs.
+    # On CUDA, check for bfloat16 support. MPS always supports it.
+    dtype = "bfloat16"
     if torch.backends.mps.is_available():
         device = "mps"
     elif torch.cuda.is_available():
         device = "cuda"
+        if not torch.cuda.is_bf16_supported():
+            dtype = "float16"
     else:
         device = "cpu"
-
-    device_type = "cuda" if device == "cuda" else "cpu"
-
-    print(f"Using device: {device}")
-
-    if device in ["cuda", "mps"] and torch.cuda.is_bf16_supported():
-        # On CUDA, check for bfloat16 support. MPS always supports it.
-        dtype = "bfloat16"
-    elif device == "cuda":  # Fallback for older NVIDIA GPUs
-        dtype = "float16"
-    else:  # CPU
-        dtype = "bfloat16"  # bfloat16 is also good on modern CPUs
 
     ptdtype = {
         "float32": torch.float32,
@@ -117,10 +112,13 @@ def main(args):
         "float16": torch.float16,
     }[dtype]
 
+    print(f"Using device: {device}")
+    print(f"dtype: {dtype}")
+
     ctx = (
-        nullcontext()
-        if device_type == "cpu"
-        else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
+        torch.amp.autocast(device_type=device, dtype=ptdtype)
+        if device != "cpu"
+        else nullcontext()
     )
 
     # Enabled for float16, bfloat16 doesn't need it.
@@ -169,7 +167,7 @@ def main(args):
                 args.data_dir,
                 args.sequence_length,
                 args.batch_size,
-                device_type,
+                device,
                 device,
             )
             _, loss = model(X, y)
@@ -208,7 +206,7 @@ def main(args):
                 args.data_dir,
                 args.sequence_length,
                 args.batch_size,
-                device_type,
+                device,
                 device,
             )
 
