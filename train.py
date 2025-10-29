@@ -1,4 +1,10 @@
-"""Gemma from scratch"""
+"""
+Gemma from scratch
+
+This script provides a comprehensive training pipeline for a Gemma-like model.
+It includes features such as mixed-precision training, gradient accumulation,
+learning rate scheduling with warmup and cosine decay, and logging with TensorBoard.
+"""
 
 import os
 import argparse
@@ -35,18 +41,18 @@ def evaluate_model(
 
                 losses[k] = loss.item()
 
-                # Calculate accuracy
+                # Calculate accuracy by comparing the predicted token (argmax) with the target token
                 preds = torch.argmax(logits, dim=-1)
                 correct_predictions += (preds == targets).sum().item()
                 total_predictions += targets.numel()
 
             split_loss = losses.mean()
             metrics[f"{split}_loss"] = split_loss
-            # Calculate perplexity from the mean loss
+            # Perplexity is the exponential of the cross-entropy loss
             metrics[f"{split}_perplexity"] = torch.exp(split_loss)
             metrics[f"{split}_accuracy"] = correct_predictions / total_predictions
 
-    model.train()
+    model.train()  # Switch back to training mode
     return metrics
 
 
@@ -54,20 +60,29 @@ def evaluate_model(
 
 
 def get_batch(split, data_dir, sequence_length, batch_size, device_type, device):
-    """Loads a batch of data from the appropriate binary file."""
-    # We recreate np.memmap every batch to avoid a memory leak, as per
-    # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
+    """
+    Loads a batch of data efficiently using memory-mapping.
+
+    This function memory-maps the binary data file to avoid loading the entire dataset
+    into RAM. It then randomly samples starting positions for sequences to form a batch.
+
+    It recreates np.memmap every batch to avoid a memory leak, as per
+    https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
+    """
+    # Use np.memmap to treat the file on disk as a NumPy array without loading it all into memory.
     file_path = os.path.join(data_dir, f"{split}.bin")
     data = np.memmap(file_path, dtype=np.uint16, mode="r")
 
+    # Randomly select starting indices for the batches
     ix = torch.randint(len(data) - sequence_length, (batch_size,))
-    x = torch.from_numpy(np.array([data[i : i + sequence_length] for i in ix])).long()
+    x = torch.from_numpy(np.stack([data[i : i + sequence_length] for i in ix])).long()
     y = torch.from_numpy(
-        np.array([data[i + 1 : i + 1 + sequence_length] for i in ix])
+        np.stack([data[i + 1 : i + 1 + sequence_length] for i in ix])
     ).long()
 
+    # Move tensors to the specified device.
+    # If on CUDA, pin memory for faster (asynchronous -> non_blocking=True) transfer.
     if device_type == "cuda":
-        # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
         x, y = (
             x.pin_memory().to(device, non_blocking=True),
             y.pin_memory().to(device, non_blocking=True),
@@ -88,23 +103,23 @@ def main(args):
     os.makedirs(models_dir, exist_ok=True)
     best_model_params_path = os.path.join(models_dir, f"best_model_{timestamp}.pt")
 
-    # TensorBoard setup
+    # TensorBoard setup for real-time monitoring of training
     writer = SummaryWriter(log_dir=f"runs/gemma_{timestamp}")
 
+    # Set a fixed seed for reproducibility
     torch.manual_seed(123)
 
-    # Set the device (mps for Apple Silicon, cuda for NVIDIA, cpu as fallback)
-    # bfloat16 is good on modern CPUs and GPUs.
-    # On CUDA, check for bfloat16 support. MPS always supports it.
-    dtype = "bfloat16"
+    # Determine the optimal device and data type for training
     if torch.backends.mps.is_available():
-        device = "mps"
+        device = torch.device("mps")
+        dtype = "bfloat16"  # MPS always supports bfloat16
     elif torch.cuda.is_available():
-        device = "cuda"
-        if not torch.cuda.is_bf16_supported():
-            dtype = "float16"
+        device = torch.device("cuda")
+        # Use bfloat16 if supported for better performance, else fall back to float16
+        dtype = "bfloat16" if torch.cuda.is_bf16_supported() else "float16"
     else:
-        device = "cpu"
+        device = torch.device("cpu")
+        dtype = "bfloat16"  # bfloat16 is also good on modern CPUs
 
     ptdtype = {
         "float32": torch.float32,
@@ -115,19 +130,21 @@ def main(args):
     print(f"Using device: {device}")
     print(f"dtype: {dtype}")
 
+    # Use autocast for mixed-precision training to save memory and speed up computation
     ctx = (
         torch.amp.autocast(device_type=device, dtype=ptdtype)
         if device != "cpu"
         else nullcontext()
     )
 
-    # Enabled for float16, bfloat16 doesn't need it.
+    # GradScaler is only needed for float16 to prevent underflow of small gradients
     scaler = torch.amp.GradScaler(enabled=(dtype == "float16"))
 
     # --- Model and Optimizer ---
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
     model.to(device)
 
+    # AdamW is a robust optimizer with weight decay
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=args.learning_rate,
@@ -136,6 +153,8 @@ def main(args):
         eps=1e-9,
     )
 
+    # The scheduler implements a linear warmup followed by a cosine decay.
+    # This helps stabilize training in the beginning and converge better at the end.
     num_optimizer_steps = args.max_iters // args.gradient_accumulation_steps
     warmup_optimizer_steps = args.warmup_steps // args.gradient_accumulation_steps
 
@@ -159,8 +178,9 @@ def main(args):
     print(
         f"Starting training run {timestamp}. Saving best model to {best_model_params_path}"
     )
-    for iter_num in tqdm(range(args.max_iters)):
-        # Forward and backward pass
+    pbar = tqdm(range(args.max_iters))
+    for iter_num in pbar:
+        # Accumulate gradients over multiple steps to simulate a larger batch size
         with ctx:
             X, y = get_batch(
                 "train",
@@ -173,31 +193,43 @@ def main(args):
             _, loss = model(X, y)
             loss = loss / args.gradient_accumulation_steps
 
+        # Backward pass with gradient scaling
         scaler.scale(loss).backward()
 
-        # Optimizer step
+        # Perform an optimizer step only after accumulating gradients for the specified number of steps.
         if ((iter_num + 1) % args.gradient_accumulation_steps == 0) or (
             iter_num + 1 == args.max_iters
         ):
+            # Clip gradients to prevent them from exploding, which can destabilize training
             grad_norm = torch.nn.utils.clip_grad_norm_(
                 model.parameters(), max_norm=1.0
             )  # Using max_norm=1.0 is also a common choice
+
+            # Log gradient norm after it has been computed
             writer.add_scalar("Train/gradient_norm", grad_norm, iter_num)
 
+            # Step the optimizer, update the scaler, and reset gradients
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad(set_to_none=True)
             scheduler.step()
 
-        # Logging
-        writer.add_scalar(
-            "Train/learning_rate", optimizer.param_groups[0]["lr"], iter_num
-        )
-        writer.add_scalar(
-            "Train/loss_step", loss.item() * args.gradient_accumulation_steps, iter_num
-        )
+        # Log the unscaled loss for interpretability
+        if iter_num % 10 == 0:  # Log more frequently
+            writer.add_scalar(
+                "Train/learning_rate", optimizer.param_groups[0]["lr"], iter_num
+            )
+            # Log the unscaled loss for interpretability
+            writer.add_scalar(
+                "Train/loss_step",
+                loss.item() * args.gradient_accumulation_steps,
+                iter_num,
+            )
+            pbar.set_description(
+                f"Loss: {loss.item() * args.gradient_accumulation_steps:.4f}"
+            )
 
-        # Evaluation
+        # Periodically evaluate the model on the validation set to track progress
         if iter_num % args.eval_interval == 0 and iter_num != 0:
             metrics = evaluate_model(
                 model,
@@ -217,12 +249,14 @@ def main(args):
                 f"val_accuracy {metrics['val_accuracy']:.4f}"
             )
 
+            # Log all evaluation metrics to TensorBoard
             for key, value in metrics.items():
                 writer.add_scalar(f"Metrics/{key}", value, iter_num)
 
             train_loss_list.append(metrics["train_loss"])
             validation_loss_list.append(metrics["val_loss"])
 
+            # Save a checkpoint if the validation loss has improved
             if metrics["val_loss"] < best_val_loss:
                 best_val_loss = metrics["val_loss"]
                 torch.save(model.state_dict(), best_model_params_path)
@@ -230,6 +264,7 @@ def main(args):
     writer.close()
     print(f"\nTraining finished. Best model saved at: {best_model_params_path}")
 
+    # Create and save a plot of training and validation loss
     plt.plot(train_loss_list, "g", label="train_loss")
     plt.plot(validation_loss_list, "r", label="validation_loss")
     plt.xlabel(f"Iterations (x{iter_num})")
@@ -244,7 +279,7 @@ if __name__ == "__main__":
         description="Train a Gemma-like model from scratch."
     )
 
-    # Preprocessed training data
+    # Data arguments
     parser.add_argument(
         "--data_dir",
         type=str,
@@ -267,8 +302,7 @@ if __name__ == "__main__":
         type=int,
         default=150_000,
         help="Total training iterations. Set to -1 to run for exactly one epoch.",
-    )
-    # max iters of TinyStories: 14_746_016
+    )  # max iters of TinyStories: 14_746_016
     parser.add_argument(
         "--warmup_steps", type=int, default=1000, help="Number of warmup steps."
     )
@@ -300,10 +334,12 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    # Override the max_iters argument
+
+    # If max_iters is set to -1, calculate the number of iterations for one full epoch.
     if args.max_iters == -1:
         print("max_iters set to -1. Calculating iterations for one full epoch.")
         train_data_path = os.path.join(args.data_dir, "train.bin")
+        # Note: This memory-maps the file, not loading it all into RAM, so it's efficient.
         train_data = np.memmap(train_data_path, dtype=np.uint16, mode="r")
         num_tokens = len(train_data)
         num_possible_sequences = num_tokens - args.sequence_length
