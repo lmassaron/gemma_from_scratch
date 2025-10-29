@@ -92,7 +92,7 @@ def apply_chat_template(user_text: str) -> str:
 def download_tokenizer_if_needed(repo_id: str, local_dir: Path) -> Path:
     """
     Downloads the tokenizer file from Hugging Face Hub if it doesn't exist locally.
-    In case you have no permission to load it, it falls back to 
+    In case you have no permission to load it, it falls back to
 
     Args:
         repo_id (str): The Hugging Face repository ID to download from.
@@ -123,21 +123,25 @@ def download_tokenizer_if_needed(repo_id: str, local_dir: Path) -> Path:
                 )
                 print("Download complete.")
             except (IOError, ValueError) as e:
-                print(f"Warning: Failed to download tokenizer.json: {e}", file=sys.stderr)
+                print(
+                    f"Warning: Failed to download tokenizer.json: {e}", file=sys.stderr
+                )
 
     return tokenizer_path
+
 
 def get_gemma_tokenizer():
     tokenizer_file = download_tokenizer_if_needed(REPO_ID, LOCAL_DIR)
     gemma_tokenizer = GemmaTokenizer(tokenizer_file_path=tokenizer_file)
     return gemma_tokenizer
 
+
 def get_gpt2_tokenizer():
     gpt2_tokenizer = tiktoken.get_encoding("gpt2")
     return gpt2_tokenizer
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     # Instantiating a tokenizer class with the downloaded Gemma tokenizer.
     gemma_tokenizer = get_gemma_tokenizer()
 
@@ -147,7 +151,7 @@ if __name__ == "__main__":
     # Applying the model-specific chat template.
     # This formats the input correctly for the model to understand it's a user prompt.
     formatted_prompt = apply_chat_template(user_message)
-    
+
     print("--- Chat Template ---")
     print(f"Original message: '{user_message}'")
     print(f"Formatted for model:\n'{formatted_prompt}'")

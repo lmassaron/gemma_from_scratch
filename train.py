@@ -51,26 +51,18 @@ def evaluate_model(
 
 
 # Some functions from https://github.com/karpathy/nanoGPT/blob/master/train.py with slight modifications
-# block size = context window
 
 
-def get_batch(split, data_dir, block_size, batch_size, device_type, device):
+def get_batch(split, data_dir, sequence_length, batch_size, device_type, device):
     """Loads a batch of data from the appropriate binary file."""
     # We recreate np.memmap every batch to avoid a memory leak, as per
     # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
     file_path = os.path.join(data_dir, f"{split}.bin")
     data = np.memmap(file_path, dtype=np.uint16, mode="r")
 
-    ix = torch.randint(len(data) - block_size, (batch_size,))
-    x = torch.stack(
-        [torch.from_numpy((data[i : i + block_size]).astype(np.int64)) for i in ix]
-    )
-    y = torch.stack(
-        [
-            torch.from_numpy((data[i + 1 : i + 1 + block_size]).astype(np.int64))
-            for i in ix
-        ]
-    )
+    ix = torch.randint(len(data) - sequence_length, (batch_size,))
+    x = torch.from_numpy(np.array([data[i:i + sequence_length] for i in ix])).long()
+    y = torch.from_numpy(np.array([data[i + 1:i + 1 + sequence_length] for i in ix])).long()
 
     if device_type == "cuda":
         # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
