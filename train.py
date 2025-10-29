@@ -111,14 +111,14 @@ def main(args):
 
     # Determine the optimal device and data type for training
     if torch.backends.mps.is_available():
-        device = torch.device("mps")
+        device = "mps"
         dtype = "bfloat16"  # MPS always supports bfloat16
     elif torch.cuda.is_available():
-        device = torch.device("cuda")
+        device = "cuda"
         # Use bfloat16 if supported for better performance, else fall back to float16
         dtype = "bfloat16" if torch.cuda.is_bf16_supported() else "float16"
     else:
-        device = torch.device("cpu")
+        device = "cpu"
         dtype = "bfloat16"  # bfloat16 is also good on modern CPUs
 
     ptdtype = {
