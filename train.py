@@ -107,7 +107,7 @@ def main(args):
     writer = SummaryWriter(log_dir=f"runs/gemma_{timestamp}")
 
     # Set a fixed seed for reproducibility
-    torch.manual_seed(123)
+    torch.manual_seed(args.seed)
 
     # Determine the optimal device and data type for training
     if torch.backends.mps.is_available():
@@ -215,7 +215,7 @@ def main(args):
             scheduler.step()
 
         # Log the unscaled loss for interpretability
-        if iter_num % 10 == 0:  # Log more frequently
+        if iter_num % args.log_interval == 0:
             writer.add_scalar(
                 "Train/learning_rate", optimizer.param_groups[0]["lr"], iter_num
             )
@@ -306,6 +306,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--warmup_steps", type=int, default=1000, help="Number of warmup steps."
     )
+    parser.add_argument(
+        "--seed", type=int, default=0, help="Random seed for reproducibility."
+    )
 
     # Model and data parameters
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size.")
@@ -331,6 +334,12 @@ if __name__ == "__main__":
         type=int,
         default=200,
         help="Number of iterations for evaluation.",
+    )
+    parser.add_argument(
+        "--log_interval",
+        type=int,
+        default=10,
+        help="How often to log training metrics.",
     )
 
     args = parser.parse_args()
