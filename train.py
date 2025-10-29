@@ -27,18 +27,18 @@ def evaluate_model(
             total_predictions = 0
 
             for k in range(eval_iters):
-                X, Y = get_batch(
+                inputs, targets = get_batch(
                     split, data_dir, sequence_length, batch_size, device_type, device
                 )
                 with ctx:
-                    logits, loss = model(X, Y)
+                    logits, loss = model(inputs, targets)
 
                 losses[k] = loss.item()
 
                 # Calculate accuracy
                 preds = torch.argmax(logits, dim=-1)
-                correct_predictions += (preds == Y).sum().item()
-                total_predictions += Y.numel()
+                correct_predictions += (preds == targets).sum().item()
+                total_predictions += targets.numel()
 
             split_loss = losses.mean()
             metrics[f"{split}_loss"] = split_loss
