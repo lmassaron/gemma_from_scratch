@@ -106,25 +106,25 @@ def main(args):
         device = "cuda"
     else:
         device = "cpu"
-    
+
     device_type = "cuda" if device == "cuda" else "cpu"
 
     print(f"Using device: {device}")
 
-    if device in ['cuda', 'mps'] and torch.cuda.is_bf16_supported():
-         # On CUDA, check for bfloat16 support. MPS always supports it.
-        dtype = 'bfloat16'
-    elif device == 'cuda': # Fallback for older NVIDIA GPUs
-        dtype = 'float16'
-    else: # CPU
-        dtype = 'bfloat16' # bfloat16 is also good on modern CPUs
+    if device in ["cuda", "mps"] and torch.cuda.is_bf16_supported():
+        # On CUDA, check for bfloat16 support. MPS always supports it.
+        dtype = "bfloat16"
+    elif device == "cuda":  # Fallback for older NVIDIA GPUs
+        dtype = "float16"
+    else:  # CPU
+        dtype = "bfloat16"  # bfloat16 is also good on modern CPUs
 
     ptdtype = {
         "float32": torch.float32,
         "bfloat16": torch.bfloat16,
         "float16": torch.float16,
     }[dtype]
-    
+
     ctx = (
         nullcontext()
         if device_type == "cpu"
@@ -248,6 +248,7 @@ def main(args):
     plt.savefig(f"{timestamp}_loss_plot.png")
     plt.close()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Train a Gemma-like model from scratch."
@@ -272,7 +273,10 @@ if __name__ == "__main__":
         help="Minimum learning rate for cosine decay.",
     )
     parser.add_argument(
-        "--max_iters", type=int, default=150_000, help="Total training iterations. Set to -1 to run for exactly one epoch.",
+        "--max_iters",
+        type=int,
+        default=150_000,
+        help="Total training iterations. Set to -1 to run for exactly one epoch.",
     )
     # max iters of TinyStories: 14_746_016
     parser.add_argument(
@@ -282,7 +286,10 @@ if __name__ == "__main__":
     # Model and data parameters
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size.")
     parser.add_argument(
-        "--sequence_length", type=int, default=128, help="Context window length (block size)."
+        "--sequence_length",
+        type=int,
+        default=128,
+        help="Context window length (block size).",
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
@@ -307,13 +314,17 @@ if __name__ == "__main__":
     if args.max_iters == -1:
         print("max_iters set to -1. Calculating iterations for one full epoch.")
         train_data_path = os.path.join(args.data_dir, "train.bin")
-        train_data = np.memmap(train_data_path, dtype=np.uint16, mode='r')
+        train_data = np.memmap(train_data_path, dtype=np.uint16, mode="r")
         num_tokens = len(train_data)
         num_possible_sequences = num_tokens - args.sequence_length
         iters_for_one_epoch = num_possible_sequences // args.batch_size
         print(f"  Training data has {num_tokens:,} tokens.")
-        print(f"  Number of possible sequences of length {args.sequence_length}: {num_possible_sequences:,}")
-        print(f"  With a batch size of {args.batch_size}, one epoch is approx. {iters_for_one_epoch:,} iterations.")
+        print(
+            f"  Number of possible sequences of length {args.sequence_length}: {num_possible_sequences:,}"
+        )
+        print(
+            f"  With a batch size of {args.batch_size}, one epoch is approx. {iters_for_one_epoch:,} iterations."
+        )
         args.max_iters = iters_for_one_epoch
 
     main(args)

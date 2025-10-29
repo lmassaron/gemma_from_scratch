@@ -101,7 +101,7 @@ if __name__ == "__main__":
         device = "cuda"
     else:
         device = "cpu"
-    
+
     print(f"Using device: {device}")
 
     load_weights_into_gemma(model, GEMMA3_CONFIG_270M, weights_dict)

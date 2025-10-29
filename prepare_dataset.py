@@ -7,6 +7,7 @@ from gemma_scratch.tokenizer import get_gpt2_tokenizer
 
 enc = get_gpt2_tokenizer()
 
+
 def process(example):
     """Encoding text."""
     # Encode ordinary ignores any special tokens

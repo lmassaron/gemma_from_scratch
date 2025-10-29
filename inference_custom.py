@@ -43,7 +43,7 @@ if __name__ == "__main__":
         device = "cuda"
     else:
         device = "cpu"
-    
+
     print(f"Using device: {device}")
 
     model_params_path = args.model_path
