@@ -10,6 +10,7 @@ import os
 import argparse
 from contextlib import nullcontext
 from datetime import datetime
+import time
 import numpy as np
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
@@ -178,6 +179,7 @@ def main(args):
     print(
         f"Starting training run {timestamp}. Saving best model to {best_model_params_path}"
     )
+    start_time = time.time()  # Start the timer
     pbar = tqdm(range(args.max_iters))
     for iter_num in pbar:
         # Accumulate gradients over multiple steps to simulate a larger batch size
@@ -262,7 +264,10 @@ def main(args):
                 torch.save(model.state_dict(), best_model_params_path)
 
     writer.close()
-    print(f"\nTraining finished. Best model saved at: {best_model_params_path}")
+    end_time = time.time()  # Stop the timer
+    training_duration = end_time - start_time
+    print(f"\nTraining completed in {training_duration:.2f} seconds.")
+    print(f"Best model saved at: {best_model_params_path}")
 
     # Create and save a plot of training and validation loss
     plt.plot(train_loss_list, "g", label="train_loss")
