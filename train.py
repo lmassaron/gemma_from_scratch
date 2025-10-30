@@ -17,9 +17,25 @@ import matplotlib.pyplot as plt
 import torch
 from torch.optim.lr_scheduler import LinearLR, SequentialLR, CosineAnnealingLR
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import Dataset, DataLoader
 from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
+class MemmapDataset(Dataset):
+    def __init__(self, data_path, sequence_length):
+        # Memory-map the file
+        self.data = np.memmap(data_path, dtype=np.uint16, mode='r')
+        self.sequence_length = sequence_length
+
+    def __len__(self):
+        # Return the total number of possible sequences
+        return len(self.data) - self.sequence_length
+
+    def __getitem__(self, idx):
+        # Get a single sequence and its target
+        x = torch.from_numpy(self.data[idx : idx + self.sequence_length].astype(np.int64))
+        y = torch.from_numpy(self.data[idx + 1 : idx + 1 + self.sequence_length].astype(np.int64))
+        return x, y
 
 def evaluate_model(
     model, eval_iters, ctx, data_dir, sequence_length, batch_size, device_type, device
@@ -146,7 +162,7 @@ def main(args):
     model.to(device)
 
     # Compile the model
-    print("Compiling the model... (this can take a minute)")
+    print("Compiling the model (this can take a while)")
     model = torch.compile(model)
 
     # AdamW is a robust optimizer with weight decay
@@ -177,6 +193,18 @@ def main(args):
 
     best_val_loss = float("inf")
 
+    # --- Create a parallel DataLoader for training data ---
+    train_dataset = MemmapDataset(os.path.join(args.data_dir, "train.bin"), args.sequence_length)
+    # Set num_workers > 0 to enable parallel loading. A good starting point is half your CPU cores.
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True if device == "cuda" else False
+    )
+    train_iter = iter(train_loader)
+
     # --- Training Loop ---
     train_loss_list = []
     validation_loss_list = []
@@ -186,16 +214,23 @@ def main(args):
     start_time = time.time()  # Start the timer
     pbar = tqdm(range(args.max_iters))
     for iter_num in pbar:
+        
+        # Get the next batch from the parallel loader
+        try:
+            X, y = next(train_iter)
+        except StopIteration:
+            # Re-initialize if the epoch finishes
+            train_iter = iter(train_loader)
+            X, y = next(train_iter)
+
+        # Move batch to the correct device
+        if device == "cuda":
+            X, y = X.to(device, non_blocking=True), y.to(device, non_blocking=True)
+        else:
+            X, y = X.to(device), y.to(device)
+
         # Accumulate gradients over multiple steps to simulate a larger batch size
         with ctx:
-            X, y = get_batch(
-                "train",
-                args.data_dir,
-                args.sequence_length,
-                args.batch_size,
-                device,
-                device,
-            )
             _, loss = model(X, y)
             loss = loss / args.gradient_accumulation_steps
 
