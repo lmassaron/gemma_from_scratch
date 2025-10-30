@@ -172,6 +172,9 @@ def main(args):
         betas=(0.9, 0.95),
         weight_decay=0.1,
         eps=1e-9,
+        fused=(
+            True if device == "cuda" else False
+        ),  # Enable fused implementation on CUDA
     )
 
     # The scheduler implements a linear warmup followed by a cosine decay.
@@ -214,7 +217,7 @@ def main(args):
     start_time = time.time()  # Start the timer
     pbar = tqdm(range(args.max_iters))
     for iter_num in pbar:
-        
+
         # Get the next batch from the parallel loader
         try:
             X, y = next(train_iter)
