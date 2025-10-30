@@ -145,6 +145,10 @@ def main(args):
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
     model.to(device)
 
+    # Compile the model
+    print("Compiling the model... (this can take a minute)")
+    model = torch.compile(model)
+
     # AdamW is a robust optimizer with weight decay
     optimizer = torch.optim.AdamW(
         model.parameters(),
