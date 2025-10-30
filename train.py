@@ -21,10 +21,13 @@ from torch.utils.data import Dataset, DataLoader
 from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
+
 class MemmapDataset(Dataset):
+    """A PyTorch Dataset that loads sequences from a memory-mapped .bin file."""
+
     def __init__(self, data_path, sequence_length):
         # Memory-map the file
-        self.data = np.memmap(data_path, dtype=np.uint16, mode='r')
+        self.data = np.memmap(data_path, dtype=np.uint16, mode="r")
         self.sequence_length = sequence_length
 
     def __len__(self):
@@ -33,80 +36,63 @@ class MemmapDataset(Dataset):
 
     def __getitem__(self, idx):
         # Get a single sequence and its target
-        x = torch.from_numpy(self.data[idx : idx + self.sequence_length].astype(np.int64))
-        y = torch.from_numpy(self.data[idx + 1 : idx + 1 + self.sequence_length].astype(np.int64))
+        x = torch.from_numpy(
+            self.data[idx : idx + self.sequence_length].astype(np.int64)
+        )
+        y = torch.from_numpy(
+            self.data[idx + 1 : idx + 1 + self.sequence_length].astype(np.int64)
+        )
         return x, y
 
-def evaluate_model(
-    model, eval_iters, ctx, data_dir, sequence_length, batch_size, device_type, device
-):
+
+def evaluate_model(model, eval_iters, ctx, loaders, device):
     """Calculates loss, perplexity, and accuracy for train and validation splits."""
     metrics = {}
-    model.eval()
+    model.eval()  # Set model to evaluation mode
     with torch.inference_mode():
-        for split in ["train", "val"]:
+        for split, loader in loaders.items():
             losses = torch.zeros(eval_iters)
             correct_predictions = 0
             total_predictions = 0
 
+            # Create a fresh iterator for the loader
+            loader_iter = iter(loader)
             for k in range(eval_iters):
-                inputs, targets = get_batch(
-                    split, data_dir, sequence_length, batch_size, device_type, device
-                )
+                # Get the next batch, re-initializing the iterator if the loader is exhausted
+                try:
+                    inputs, targets = next(loader_iter)
+                except StopIteration:
+                    loader_iter = iter(loader)
+                    inputs, targets = next(loader_iter)
+
+                # Move data to the correct device
+                if device == "cuda":
+                    inputs, targets = (
+                        inputs.to(device, non_blocking=True),
+                        targets.to(device, non_blocking=True),
+                    )
+                else:
+                    inputs, targets = inputs.to(device), targets.to(device)
+
+                # Forward pass
                 with ctx:
                     logits, loss = model(inputs, targets)
 
                 losses[k] = loss.item()
 
-                # Calculate accuracy by comparing the predicted token (argmax) with the target token
+                # Calculate accuracy
                 preds = torch.argmax(logits, dim=-1)
                 correct_predictions += (preds == targets).sum().item()
                 total_predictions += targets.numel()
 
+            # Calculate final metrics for the split
             split_loss = losses.mean()
             metrics[f"{split}_loss"] = split_loss
-            # Perplexity is the exponential of the cross-entropy loss
             metrics[f"{split}_perplexity"] = torch.exp(split_loss)
             metrics[f"{split}_accuracy"] = correct_predictions / total_predictions
 
     model.train()  # Switch back to training mode
     return metrics
-
-
-# Some functions from https://github.com/karpathy/nanoGPT/blob/master/train.py with slight modifications
-
-
-def get_batch(split, data_dir, sequence_length, batch_size, device_type, device):
-    """
-    Loads a batch of data efficiently using memory-mapping.
-
-    This function memory-maps the binary data file to avoid loading the entire dataset
-    into RAM. It then randomly samples starting positions for sequences to form a batch.
-
-    It recreates np.memmap every batch to avoid a memory leak, as per
-    https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
-    """
-    # Use np.memmap to treat the file on disk as a NumPy array without loading it all into memory.
-    file_path = os.path.join(data_dir, f"{split}.bin")
-    data = np.memmap(file_path, dtype=np.uint16, mode="r")
-
-    # Randomly select starting indices for the batches
-    ix = torch.randint(len(data) - sequence_length, (batch_size,))
-    x = torch.from_numpy(np.stack([data[i : i + sequence_length] for i in ix])).long()
-    y = torch.from_numpy(
-        np.stack([data[i + 1 : i + 1 + sequence_length] for i in ix])
-    ).long()
-
-    # Move tensors to the specified device.
-    # If on CUDA, pin memory for faster (asynchronous -> non_blocking=True) transfer.
-    if device_type == "cuda":
-        x, y = (
-            x.pin_memory().to(device, non_blocking=True),
-            y.pin_memory().to(device, non_blocking=True),
-        )
-    else:
-        x, y = x.to(device), y.to(device)
-    return x, y
 
 
 def main(args):
@@ -162,8 +148,9 @@ def main(args):
     model.to(device)
 
     # Compile the model
-    print("Compiling the model (this can take a while)")
-    model = torch.compile(model)
+    if torch.__version__ >= "2.0":
+        print("Compiling the model (this can take a while)")
+        model = torch.compile(model)
 
     # AdamW is a robust optimizer with weight decay
     optimizer = torch.optim.AdamW(
@@ -197,53 +184,72 @@ def main(args):
     best_val_loss = float("inf")
 
     # --- Create a parallel DataLoader for training data ---
-    train_dataset = MemmapDataset(os.path.join(args.data_dir, "train.bin"), args.sequence_length)
+    train_dataset = MemmapDataset(
+        os.path.join(args.data_dir, "train.bin"), args.sequence_length
+    )
     # Set num_workers > 0 to enable parallel loading. A good starting point is half your CPU cores.
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=4,
-        pin_memory=True if device == "cuda" else False
+        pin_memory=True if device == "cuda" else False,
+        persistent_workers=True,  # Reuse workers
     )
-    train_iter = iter(train_loader)
+
+    val_dataset = MemmapDataset(
+        os.path.join(args.data_dir, "val.bin"), args.sequence_length
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        num_workers=4,
+        pin_memory=True if device == "cuda" else False,
+        persistent_workers=True,  # Reuse workers
+    )
+
+    eval_loaders = {"train": train_loader, "val": val_loader}
 
     # --- Training Loop ---
     train_loss_list = []
     validation_loss_list = []
+    train_iter = iter(train_loader)
     print(
         f"Starting training run {timestamp}. Saving best model to {best_model_params_path}"
     )
     start_time = time.time()  # Start the timer
     pbar = tqdm(range(args.max_iters))
     for iter_num in pbar:
+        is_accumulating = (iter_num + 1) % args.gradient_accumulation_steps != 0
+        is_last_iter = iter_num + 1 == args.max_iters
 
         # Get the next batch from the parallel loader
         try:
-            X, y = next(train_iter)
+            inputs, targets = next(train_iter)
         except StopIteration:
             # Re-initialize if the epoch finishes
             train_iter = iter(train_loader)
-            X, y = next(train_iter)
+            inputs, targets = next(train_iter)
 
         # Move batch to the correct device
         if device == "cuda":
-            X, y = X.to(device, non_blocking=True), y.to(device, non_blocking=True)
+            inputs, targets = (
+                inputs.to(device, non_blocking=True),
+                targets.to(device, non_blocking=True),
+            )
         else:
-            X, y = X.to(device), y.to(device)
+            inputs, targets = inputs.to(device), targets.to(device)
 
         # Accumulate gradients over multiple steps to simulate a larger batch size
         with ctx:
-            _, loss = model(X, y)
+            _, loss = model(inputs, targets)
             loss = loss / args.gradient_accumulation_steps
 
         # Backward pass with gradient scaling
         scaler.scale(loss).backward()
 
         # Perform an optimizer step only after accumulating gradients for the specified number of steps.
-        if ((iter_num + 1) % args.gradient_accumulation_steps == 0) or (
-            iter_num + 1 == args.max_iters
-        ):
+        if not (is_accumulating) or is_last_iter:
             # Clip gradients to prevent them from exploding, which can destabilize training
             grad_norm = torch.nn.utils.clip_grad_norm_(
                 model.parameters(), max_norm=1.0
@@ -279,10 +285,7 @@ def main(args):
                 model,
                 args.eval_iters,
                 ctx,
-                args.data_dir,
-                args.sequence_length,
-                args.batch_size,
-                device,
+                eval_loaders,
                 device,
             )
 
