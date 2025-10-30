@@ -5,6 +5,7 @@ d = 8192
 x = torch.randn(size=(d, d)).to(torch.bfloat16).to("cuda")
 y = torch.randn(size=(d, d)).to(torch.bfloat16).to("cuda")
 
+
 def fun(x):
     for _ in range(50):
         x = x @ y.T
