@@ -10,6 +10,7 @@ import os
 import argparse
 from contextlib import nullcontext
 from datetime import datetime
+from itertools import cycle
 import time
 import math
 import numpy as np
@@ -46,25 +47,19 @@ class MemmapDataset(Dataset):
         return x, y
 
 
-def evaluate_model(model, eval_iters, ctx, loaders, device):
+def evaluate_model(model, eval_iters, ctx, iterators, device):
     """Calculates loss, perplexity, and accuracy for train and validation splits."""
     metrics = {}
     model.eval()  # Set model to evaluation mode
     with torch.inference_mode():
-        for split, loader in loaders.items():
+        for split, loader_iter in iterators.items():
             total_loss = 0.0
             total_correct_predictions = 0
             total_predictions = 0
 
-            # Create a fresh iterator for the loader
-            loader_iter = iter(loader)
+            # Simply get the next batch from the persistent iterator
             for k in range(eval_iters):
-                # Get the next batch, re-initializing the iterator if the loader is exhausted
-                try:
-                    inputs, targets = next(loader_iter)
-                except StopIteration:
-                    loader_iter = iter(loader)
-                    inputs, targets = next(loader_iter)
+                inputs, targets = next(loader_iter)
 
                 # Move data to the correct device
                 if device == "cuda":
@@ -210,7 +205,24 @@ def main(args):
         persistent_workers=True,  # Reuse workers
     )
 
-    eval_loaders = {"train": train_loader, "val": val_loader}
+    # Create a SECOND, DEDICATED data loader for evaluating on the training set.
+    # It uses the same dataset but is a completely separate object.
+    # No shuffling is needed for evaluation.
+    train_eval_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,  # No need to shuffle for evaluation
+        num_workers=4,
+        pin_memory=True if device == "cuda" else False,
+        persistent_workers=True,
+    )
+
+    # Create persistent iterators for evaluation ONCE before the training loop.
+    # This avoids the expensive re-initialization lag.
+    eval_iterators = {
+        "train": cycle(train_eval_loader),
+        "val": cycle(val_loader),
+    }
 
     # --- Training Loop ---
     train_loss_list = []
@@ -288,7 +300,7 @@ def main(args):
                 model,
                 args.eval_iters,
                 ctx,
-                eval_loaders,
+                eval_iterators,
                 device,
             )
 
