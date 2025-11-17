@@ -1,6 +1,7 @@
 import time
 import torch
 
+
 def benchmark_matmul(
     d: int,
     num_iterations: int,

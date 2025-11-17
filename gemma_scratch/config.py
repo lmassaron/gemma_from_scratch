@@ -39,6 +39,7 @@ GEMMA3_CONFIG_CUSTOM = {
     "query_pre_attn_scalar": 256,
 }
 
+# see https://github.com/google/gemma.cpp/blob/3ed403e28707c0e3eb5f48b0e487b63a446d8e2e/gemma/configs.cc#L402
 GEMMA3_CONFIG_270M = {
     "vocab_size": 262_144,
     "context_length": 32_768,
