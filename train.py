@@ -11,6 +11,7 @@ import argparse
 from contextlib import nullcontext
 from datetime import datetime
 import time
+import math
 import numpy as np
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
@@ -51,8 +52,8 @@ def evaluate_model(model, eval_iters, ctx, loaders, device):
     model.eval()  # Set model to evaluation mode
     with torch.inference_mode():
         for split, loader in loaders.items():
-            losses = torch.zeros(eval_iters)
-            correct_predictions = 0
+            total_loss = 0.0
+            total_correct_predictions = 0
             total_predictions = 0
 
             # Create a fresh iterator for the loader
@@ -78,18 +79,19 @@ def evaluate_model(model, eval_iters, ctx, loaders, device):
                 with ctx:
                     logits, loss = model(inputs, targets)
 
-                losses[k] = loss.item()
-
-                # Calculate accuracy
+                # Accumulate metrics on the GPU
+                total_loss += loss
                 preds = torch.argmax(logits, dim=-1)
-                correct_predictions += (preds == targets).sum().item()
+                total_correct_predictions += (preds == targets).sum()
                 total_predictions += targets.numel()
 
-            # Calculate final metrics for the split
-            split_loss = losses.mean()
-            metrics[f"{split}_loss"] = split_loss
-            metrics[f"{split}_perplexity"] = torch.exp(split_loss)
-            metrics[f"{split}_accuracy"] = correct_predictions / total_predictions
+            # Transfer final metrics to CPU once
+            avg_loss = (total_loss / eval_iters).item()
+            accuracy = total_correct_predictions.item() / total_predictions
+
+            metrics[f"{split}_loss"] = avg_loss
+            metrics[f"{split}_perplexity"] = math.exp(avg_loss)
+            metrics[f"{split}_accuracy"] = accuracy
 
     model.train()  # Switch back to training mode
     return metrics
@@ -291,7 +293,7 @@ def main(args):
             )
 
             print(
-                f"\nIteration {iter_num}: "
+                f"\nIteration {iter_num + 1}: "
                 f"val_loss {metrics['val_loss']:.4f}, "
                 f"val_perplexity {metrics['val_perplexity']:.4f}, "
                 f"val_accuracy {metrics['val_accuracy']:.4f}"
@@ -299,7 +301,7 @@ def main(args):
 
             # Log all evaluation metrics to TensorBoard
             for key, value in metrics.items():
-                writer.add_scalar(f"Metrics/{key}", value, iter_num)
+                writer.add_scalar(f"Metrics/{key}", value, iter_num + 1)
 
             train_loss_list.append(metrics["train_loss"])
             validation_loss_list.append(metrics["val_loss"])
@@ -307,7 +309,7 @@ def main(args):
             # Save a checkpoint if the validation loss has improved
             if metrics["val_loss"] < best_val_loss:
                 best_val_loss = metrics["val_loss"]
-                best_iter_num = iter_num
+                best_iter_num = iter_num + 1
                 torch.save(model.state_dict(), best_model_params_path)
 
     writer.close()
