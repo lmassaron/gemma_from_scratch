@@ -219,6 +219,7 @@ def main(args):
     )
     start_time = time.time()  # Start the timer
     pbar = tqdm(range(args.max_iters))
+    best_iter_num = 0
     for iter_num in pbar:
         is_accumulating = (iter_num + 1) % args.gradient_accumulation_steps != 0
         is_last_iter = iter_num + 1 == args.max_iters
@@ -265,7 +266,7 @@ def main(args):
             scheduler.step()
 
         # Log the unscaled loss for interpretability
-        if iter_num % args.log_interval == 0:
+        if (iter_num + 1) % args.log_interval == 0:
             writer.add_scalar(
                 "Train/learning_rate", optimizer.param_groups[0]["lr"], iter_num
             )
@@ -280,7 +281,7 @@ def main(args):
             )
 
         # Periodically evaluate the model on the validation set to track progress
-        if iter_num % args.eval_interval == 0 and iter_num != 0:
+        if (iter_num + 1) % args.eval_interval == 0 and iter_num != 0:
             metrics = evaluate_model(
                 model,
                 args.eval_iters,
@@ -306,13 +307,18 @@ def main(args):
             # Save a checkpoint if the validation loss has improved
             if metrics["val_loss"] < best_val_loss:
                 best_val_loss = metrics["val_loss"]
+                best_iter_num = iter_num
                 torch.save(model.state_dict(), best_model_params_path)
 
     writer.close()
     end_time = time.time()  # Stop the timer
     training_duration = end_time - start_time
     print(f"\nTraining completed in {training_duration:.2f} seconds.")
-    print(f"Best model saved at: {best_model_params_path}")
+    final_model_path = os.path.join(
+        models_dir, f"best_model_{timestamp}@{best_iter_num}.pt"
+    )
+    os.rename(best_model_params_path, final_model_path)
+    print(f"Best model saved at: {final_model_path}")
 
     # Create and save a plot of training and validation loss
     plt.plot(train_loss_list, "g", label="train_loss")
