@@ -31,6 +31,13 @@ if __name__ == "__main__":
         default="./models/best_model_params_01.pt",
         help="Path to the saved model parameters (.pt file). Defaults to './models/best_model_params_01.pt'.",
     )
+    parser.add_argument(
+        "--max_new_tokens",
+        type=int,
+        default=200,
+        help="Maximum number of new tokens to generate.",
+    )
+    
     args = parser.parse_args()
 
     torch.manual_seed(123)
@@ -66,6 +73,12 @@ if __name__ == "__main__":
 
     for k, test_sentence in enumerate(test_sentences):
         print(f"{k:2d}. input sentence: {test_sentence}")
-        generated = generate(test_sentence, model, enc, device, max_new_tokens=200)
+        generated = generate(
+            test_sentence,
+            model,
+            enc,
+            device,
+            max_new_tokens=args.max_new_tokens,
+        )
         print(generated)
         print("-" * 64)
