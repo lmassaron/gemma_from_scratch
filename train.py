@@ -27,9 +27,9 @@ from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 class MemmapDataset(Dataset):
     """A PyTorch Dataset that loads sequences from a memory-mapped .bin file."""
 
-    def __init__(self, data_path, sequence_length):
+    def __init__(self, data_path, sequence_length, dtype=np.uint16):
         # Memory-map the file
-        self.data = np.memmap(data_path, dtype=np.uint16, mode="r")
+        self.data = np.memmap(data_path, dtype=dtype, mode="r")
         self.sequence_length = sequence_length
 
     def __len__(self):
