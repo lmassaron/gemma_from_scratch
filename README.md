@@ -4,6 +4,13 @@ This repository provides a clear and minimal implementation for training a Gemma
 
 The implementation is heavily inspired by and builds upon the foundational work from Andrej Karpathy's [nanoGPT](https://github.com/karpathy/nanoGPT).
 
+## Two Workflows: Training vs. Inference
+
+This repository supports two primary use cases:
+  
+1.  Inference with Official Gemma Weights: The inference_google_gemma.py script uses the official Gemma tokenizer and loads the pre-trained 270M model from Hugging Face. This demonstrates the architectural compatibility of our implementation.
+2.  Training a Model From Scratch: The prepare_dataset.py and train.py scripts allow you to train a model on your own data (e.g., TinyStories). For this workflow, we use the simpler and faster GPT-2 tokenizer (tiktoken). This is a self-contained training pipeline, and the resulting model should be used with inference_custom.py, which also uses the GPT-2 tokenizer.
+
 ## Model Architecture
 
 The Gemma 3 model is a decoder-only transformer, similar to other popular language models. It is composed of the following key components:
