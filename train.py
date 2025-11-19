@@ -189,7 +189,7 @@ def main(args):
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=os.cpu_count() // 2, # A safe default
+        num_workers=os.cpu_count() // 2,  # A safe default
         pin_memory=True if device == "cuda" else False,
         persistent_workers=True,  # Reuse workers
     )

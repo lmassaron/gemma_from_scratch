@@ -74,7 +74,7 @@ if __name__ == "__main__":
             torch.cuda.manual_seed_all(args.seed)
     else:
         print("No seed provided. Using random generation.")
-        
+
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
 
     # Set the device (mps for Apple Silicon, cuda for NVIDIA, cpu as fallback)

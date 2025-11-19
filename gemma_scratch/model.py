@@ -208,10 +208,10 @@ class Gemma3Model(nn.Module):
             # Slicing ensures probs is [Batch, Vocab]
             logits = logits[:, -1, :]
 
-            if temperature==0.0: # Greedy decoding
+            if temperature == 0.0:  # Greedy decoding
                 # Just pick the single most likely token
                 _, idx_next = torch.topk(logits, k=1, dim=-1)
-            else: # Probability sampling
+            else:  # Probability sampling
                 # Apply temperature scaling
                 logits = logits / temperature
 
