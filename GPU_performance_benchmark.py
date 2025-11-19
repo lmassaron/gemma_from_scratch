@@ -56,7 +56,7 @@ def benchmark_matmul(
     total_tera_flops = (d**3) * 2 * 50 * num_iterations / (1024**4)
     tflops_per_second = total_tera_flops / elapsed_seconds if elapsed_seconds > 0 else 0
 
-    print(f"\n--- Benchmark Results ---")
+    print("\n--- Benchmark Results ---")
     print(f"Total time: {milliseconds:.3f} ms")
     print(f"Achieved TFLOPs: {tflops_per_second:.3f}")
 
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     DATA_TYPE = torch.bfloat16
 
-    print(f"Starting benchmark with the following configuration:")
+    print("Starting benchmark with the following configuration:")
     print(f"  Matrix Dimension: {MATRIX_DIMENSION}x{MATRIX_DIMENSION}")
     print(f"  Benchmark Iterations: {BENCHMARK_ITERATIONS}")
     print(f"  Warmup Iterations: {WARMUP_ITERATIONS}")
