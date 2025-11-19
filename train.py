@@ -189,7 +189,7 @@ def main(args):
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=os.cpu_count() // 2, # A safe default
         pin_memory=True if device == "cuda" else False,
         persistent_workers=True,  # Reuse workers
     )
@@ -200,7 +200,7 @@ def main(args):
     val_loader = DataLoader(
         val_dataset,
         batch_size=args.batch_size,
-        num_workers=4,
+        num_workers=os.cpu_count() // 2,  # A safe default
         pin_memory=True if device == "cuda" else False,
         persistent_workers=True,  # Reuse workers
     )
@@ -212,7 +212,7 @@ def main(args):
         train_dataset,
         batch_size=args.batch_size,
         shuffle=False,  # No need to shuffle for evaluation
-        num_workers=4,
+        num_workers=os.cpu_count() // 2,  # A safe default
         pin_memory=True if device == "cuda" else False,
         persistent_workers=True,
     )
