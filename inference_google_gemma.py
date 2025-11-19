@@ -7,14 +7,14 @@ from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 from gemma_scratch.model import Gemma3Model, load_weights_into_gemma
 from gemma_scratch.config import GEMMA3_CONFIG_270M
-from gemma_scratch.tokenizer import gemma_tokenizer
+from gemma_scratch.tokenizer import get_gemma_tokenizer
 
 
 def stream_next_token(
     model,
     token_ids,
-    max_new_tokens,
     eos_token_id=None,
+    max_new_tokens=200,
     temperature=0.7,
     repetition_penalty=1.2,
 ):
@@ -55,6 +55,8 @@ def generate(
     model,
     tokenizer,
     device,
+    temperature=0.7,
+    repetition_penalty=1.2,
     max_new_tokens=200,
 ):
     """Encodes a sentence and yields the decoded generated tokens."""
@@ -64,10 +66,10 @@ def generate(
     for token_tensor in stream_next_token(
         model=model,
         token_ids=input_token_ids_tensor,
-        max_new_tokens=max_new_tokens,
         eos_token_id=tokenizer.encode("<end_of_turn>")[-1],
-        temperature=0.7,
-        repetition_penalty=1.2,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        repetition_penalty=repetition_penalty,
     ):
         token_id_list = token_tensor.squeeze(0).tolist()
         yield tokenizer.decode(token_id_list)
@@ -77,6 +79,7 @@ if __name__ == "__main__":
     torch.manual_seed(123)
     print("Initializing the Gemma 3 Model")
     model = Gemma3Model(GEMMA3_CONFIG_270M)
+    gemma_tokenizer = get_gemma_tokenizer()
 
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Total number of parameters: {total_params:,}")
@@ -127,9 +130,15 @@ if __name__ == "__main__":
     ]
 
     for k, test_sentence in enumerate(test_sentences):
-        print(f'\n** Test {k:2d}. input sentence: "{test_sentence}"\n')
+        print(f'\n** Prompt {k + 1:2d}. start sentence: "{test_sentence}"\n')
         for token_str in generate(
-            test_sentence, model, gemma_tokenizer, device, max_new_tokens=200
+            test_sentence,
+            model,
+            gemma_tokenizer,
+            device,
+            max_new_tokens=200,
+            temperature=0.7,
+            repetition_penalty=1.2,
         ):
             print(token_str, end="", flush=True)
-        print()
+        print(f"\n{'-' * 64}\n")
