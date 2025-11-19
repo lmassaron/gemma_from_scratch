@@ -10,9 +10,15 @@ enc = get_gpt2_tokenizer()
 
 def process(example):
     """Encoding text."""
-    # Encode ordinary ignores any special tokens
+    # encode_ordinary gives a clean list of integers
     ids = enc.encode_ordinary(example["text"])
+
+    # Append the special <|endoftext|> token (ID 50256) to the end
+    ids.append(enc.eot_token)
+
+    # Verify the length is correct (now +1 compared to before)
     out = {"ids": ids, "len": len(ids)}
+
     return out
 
 

@@ -15,7 +15,11 @@ def generate(sentence, model, tokenizer, device, max_new_tokens=200):
     ).unsqueeze(dim=0)
 
     with torch.no_grad():
-        y = model.generate(context, max_new_tokens)
+        y = model.generate(context,
+                           max_new_tokens=max_new_tokens,
+                           temperature=1.0,
+                           top_k=None,
+                           eos_id=tokenizer.eot_token)
 
     return tokenizer.decode(y.squeeze().tolist())
 
@@ -56,7 +60,9 @@ if __name__ == "__main__":
     model_params_path = args.model_path
 
     # Load the checkpoint
-    checkpoint = torch.load(model_params_path, map_location=torch.device(device), weights_only=True)
+    checkpoint = torch.load(
+        model_params_path, map_location=torch.device(device), weights_only=True
+    )
 
     # Fix the keys if the model has been compiled (remove "_orig_mod." prefix)
     state_dict = {}
@@ -74,14 +80,14 @@ if __name__ == "__main__":
 
     test_sentences = [
         "Once upon a time there was a pumpkin.",
-        "A little girl went to the woods",
-        "A boy told his sister a bedtime story about a flying cat",
-        "The kids sat in a circle while Uncle narrated a story about a brave knight",
-        "Dad was telling the kids an adventure tale about a pirate ship",
+        #"A little girl went to the woods",
+        #"A boy told his sister a bedtime story about a flying cat",
+        #"The kids sat in a circle while Uncle narrated a story about a brave knight",
+        #"Dad was telling the kids an adventure tale about a pirate ship",
     ]
 
     for k, test_sentence in enumerate(test_sentences):
-        print(f"{k:2d}. input sentence: {test_sentence}")
+        print(f"{k + 1:2d}. input sentence: {test_sentence}")
         generated = generate(
             test_sentence,
             model,
@@ -90,4 +96,4 @@ if __name__ == "__main__":
             max_new_tokens=args.max_new_tokens,
         )
         print(generated)
-        print("-" * 64)
+        print(f"\n{'-' * 64}\n")

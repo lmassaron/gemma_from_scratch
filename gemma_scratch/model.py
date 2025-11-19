@@ -177,6 +177,7 @@ class Gemma3Model(nn.Module):
         max_new_tokens: int,
         temperature: float = 1.0,
         top_k: int = None,
+        eos_id: int = None,
     ) -> torch.Tensor:
         """
         Generates a sequence of new tokens autoregressively.
@@ -218,6 +219,11 @@ class Gemma3Model(nn.Module):
 
             # 5. Append the newly sampled token to the running sequence.
             idx = torch.cat((idx, idx_next), dim=1)
+
+            # 6. Check for EOS (Stop generation)
+            if eos_id is not None and idx_next.item() == eos_id:
+                print("[EOS]")
+                break
 
         return idx
 
