@@ -202,25 +202,35 @@ class Gemma3Model(nn.Module):
 
             # 2. Get the model's predictions (logits) for the next token.
             logits, _ = self(idx_cond)
-            # We only care about the logits for the very last token in the sequence.
-            logits = logits[:, -1, :] / temperature
 
-            # 3. Optional top-k sampling: this technique truncates the probability distribution.
-            if top_k is not None:
-                # Get the k-th largest logit value.
-                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                # Set all logits smaller than this threshold to negative infinity,
-                # so they will have a probability of 0 after softmax.
-                logits[logits < v[:, [-1]]] = float("-inf")
+            # 3. Focus only on the logits for the very last token in the sequence.
+            # Previously, logits was 3D [Batch, Seq, Vocab]
+            # Slicing ensures probs is [Batch, Vocab]
+            logits = logits[:, -1, :]
 
-            # 4. Convert logits to probabilities and sample the next token.
-            probs = F.softmax(logits, dim=-1)
-            idx_next = torch.multinomial(probs, num_samples=1)
+            if temperature==0.0: # Greedy decoding
+                # Just pick the single most likely token
+                _, idx_next = torch.topk(logits, k=1, dim=-1)
+            else: # Probability sampling
+                # Apply temperature scaling
+                logits = logits / temperature
 
-            # 5. Append the newly sampled token to the running sequence.
+                # Optional top-k sampling: this technique truncates the probability distribution.
+                if top_k is not None:
+                    # Get the k-th largest logit value.
+                    v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                    # Set all logits smaller than this threshold to negative infinity,
+                    # so they will have a probability of 0 after softmax.
+                    logits[logits < v[:, [-1]]] = float("-inf")
+
+                # Convert logits to probabilities and sample the next token.
+                probs = F.softmax(logits, dim=-1)
+                idx_next = torch.multinomial(probs, num_samples=1)
+
+            # 3. Append the newly sampled token to the running sequence.
             idx = torch.cat((idx, idx_next), dim=1)
 
-            # 6. Check for EOS (Stop generation)
+            # 4. Check for EOS (Stop generation)
             if eos_id is not None and idx_next.item() == eos_id:
                 print("[EOS]")
                 break

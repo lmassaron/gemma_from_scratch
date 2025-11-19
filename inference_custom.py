@@ -57,10 +57,24 @@ if __name__ == "__main__":
         default=None,
         help="Sample from the top K most likely tokens.",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Set a fixed random seed for reproducibility. If not set, generation is random.",
+    )
 
     args = parser.parse_args()
 
-    torch.manual_seed(123)
+    # Set determinism if a seed is provided
+    if args.seed is not None:
+        print(f"Setting random seed to: {args.seed}")
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
+    else:
+        print("No seed provided. Using random generation.")
+        
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
 
     # Set the device (mps for Apple Silicon, cuda for NVIDIA, cpu as fallback)
