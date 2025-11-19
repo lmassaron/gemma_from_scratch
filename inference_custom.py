@@ -9,17 +9,21 @@ from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 enc = tiktoken.get_encoding("gpt2")
 
 
-def generate(sentence, model, tokenizer, device, max_new_tokens=200):
+def generate(
+    sentence, model, tokenizer, device, max_new_tokens=200, temperature=1.0, top_k=None
+):
     context = torch.tensor(
         tokenizer.encode_ordinary(sentence), device=device
     ).unsqueeze(dim=0)
 
     with torch.no_grad():
-        y = model.generate(context,
-                           max_new_tokens=max_new_tokens,
-                           temperature=1.0,
-                           top_k=None,
-                           eos_id=tokenizer.eot_token)
+        y = model.generate(
+            context,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_k=top_k,
+            eos_id=tokenizer.eot_token,
+        )
 
     return tokenizer.decode(y.squeeze().tolist())
 
@@ -40,6 +44,18 @@ if __name__ == "__main__":
         type=int,
         default=200,
         help="Maximum number of new tokens to generate.",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=1.0,
+        help="Controls randomness. Lower is more deterministic.",
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=None,
+        help="Sample from the top K most likely tokens.",
     )
 
     args = parser.parse_args()
@@ -80,10 +96,10 @@ if __name__ == "__main__":
 
     test_sentences = [
         "Once upon a time there was a pumpkin.",
-        #"A little girl went to the woods",
-        #"A boy told his sister a bedtime story about a flying cat",
-        #"The kids sat in a circle while Uncle narrated a story about a brave knight",
-        #"Dad was telling the kids an adventure tale about a pirate ship",
+        # "A little girl went to the woods",
+        # "A boy told his sister a bedtime story about a flying cat",
+        # "The kids sat in a circle while Uncle narrated a story about a brave knight",
+        # "Dad was telling the kids an adventure tale about a pirate ship",
     ]
 
     for k, test_sentence in enumerate(test_sentences):
@@ -94,6 +110,8 @@ if __name__ == "__main__":
             enc,
             device,
             max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+            top_k=args.top_k,
         )
         print(generated)
         print(f"\n{'-' * 64}\n")
