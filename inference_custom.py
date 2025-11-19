@@ -25,7 +25,7 @@ if __name__ == "__main__":
         description="Generate text using a trained Gemma model."
     )
     parser.add_argument(
-        "model_path",
+        "--model_path",
         nargs="?",
         type=str,
         default="./models/best_model_params_01.pt",
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         default=200,
         help="Maximum number of new tokens to generate.",
     )
-    
+
     args = parser.parse_args()
 
     torch.manual_seed(123)
@@ -54,12 +54,21 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     model_params_path = args.model_path
-    model.load_state_dict(
-        torch.load(
-            model_params_path, map_location=torch.device(device), weights_only=True
-        )
-    )
 
+    # Load the checkpoint
+    checkpoint = torch.load(model_params_path, map_location=torch.device(device), weights_only=True)
+
+    # Fix the keys if the model has been compiled (remove "_orig_mod." prefix)
+    state_dict = {}
+    for key, value in checkpoint.items():
+        if key.startswith("_orig_mod."):
+            new_key = key.replace("_orig_mod.", "")
+            state_dict[new_key] = value
+        else:
+            state_dict[key] = value
+
+    # Load the fixed state dict
+    model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
 
