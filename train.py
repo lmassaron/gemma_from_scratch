@@ -337,7 +337,7 @@ def main(args):
     # Create and save a plot of training and validation loss
     plt.plot(train_loss_list, "g", label="train_loss")
     plt.plot(validation_loss_list, "r", label="validation_loss")
-    plt.xlabel(f"Iterations (x{iter_num})")
+    plt.xlabel(f"Log Intervals (iter x interval = {args.eval_interval})")
     plt.ylabel("Loss")
     plt.legend()
     plt.savefig(f"{timestamp}_loss_plot.png")
