@@ -41,7 +41,7 @@ Instruction: [Generated Content]
 
 PROMPT_GENERATION_TEMPLATE = """
 You are a creative assistant. Based on the instruction provided, generate a compatible, creative story beginning for a children's story.
-The story beginning should be a short paragraph (no more than 100 words) that sets a scene and ends mid-sentence, marked by "***".
+The story beginning should be a short paragraph (no more than 15 words) that sets a scene and ends mid-sentence, marked by "***".
 
 Instruction Type: {instruction_type}
 Instruction: {instruction_content}
@@ -67,37 +67,37 @@ Here is the story as completed by the student:
 
 ***ASSESSMENT***
 ***SCORING GUIDELINES***
-Use the following guide to assign scores (0-10):
+Use the following guide to assign scores (0-10), keeping in mind the target audience is children who are preschoolers or in elementary school.
 
-1. Grammar & Mechanics
-   - 1-3 (Poor): Frequent errors make the text difficult to read.
-   - 4-6 (Fair): Readable, but contains noticeable errors.
-   - 7-8 (Good): Mostly correct with only minor errors.
-   - 9-10 (Excellent): Flawless grammar; sophisticated structure.
+1. Grammar & Simplified Language
+   - 1-3 (Too Complex/Broken): Grammar errors OR vocabulary is too advanced/abstract for a small child.
+   - 4-6 (Fair): Grammatically okay, but sentences are too long or convoluted.
+   - 7-8 (Good): Simple, short sentences. Easy vocabulary.
+   - 9-10 (Perfect): Flawless, simple grammar. Perfectly mimics the speech/reading level of a preschooler (Subject-Verb-Object).
 
-2. Creativity
-   - 1-3 (Poor): Dull, repetitive, or minimal effort.
-   - 4-6 (Fair): Predictable or cliché.
-   - 7-8 (Good): Engaging details and interesting choices.
-   - 9-10 (Excellent): Unique voice; vivid imagery; original.
+2. Creativity (Child-Appropriate)
+   - 1-3 (Nonsense/Dark): The story makes no sense or includes themes inappropriate for children (scary/violent).
+   - 4-6 (Boring): Very repetitive or lacks any spark of imagination.
+   - 7-8 (Charming): Cute and engaging concepts (animals, friends, toys).
+   - 9-10 (Delightful): Captures a distinct sense of whimsy or wonder; highly engaging for a toddler.
 
-3. Consistency (with Beginning)
-   - 1-3 (Poor): Contradicts the beginning facts or tone.
-   - 4-6 (Fair): Loosely connected; jarring shift in style.
-   - 7-8 (Good): Follows established logic and characters.
-   - 9-10 (Excellent): Seamless transition matching the original text.
+3. Consistency
+   - 1-3 (Confusing): Names change, objects disappear, or the setting shifts randomly.
+   - 4-6 (Drifting): The story wanders away from the beginning premise.
+   - 7-8 (Steady): Maintains the characters and setting introduced in the beginning.
+   - 9-10 (Seamless): The completion feels exactly like the same author wrote it; perfect continuity of simple tone.
 
-4. Plot Coherence
-   - 1-3 (Poor): No logical sequence; confusing.
-   - 4-6 (Fair): Events happen, but pacing is off or ending is weak.
-   - 7-8 (Good): Clear beginning, middle, and end.
-   - 9-10 (Excellent): Well-paced arc with satisfying resolution.
+4. Plot Coherence & Resolution
+   - 1-3 (Unresolved): The story stops abruptly or events happen randomly.
+   - 4-6 (Weak): Things happen, but there is no clear ending or lesson.
+   - 7-8 (Clear): A simple sequence: Beginning -> Problem -> Solution.
+   - 9-10 (Satisfying): A complete narrative arc with a distinct, happy, or moral resolution (e.g., "They were friends again.").
 
 5. Instruction Following
-   - 1-3 (Failed): Ignored the instruction.
-   - 4-6 (Partial): Misunderstood or weakly executed.
-   - 7-8 (Met): Followed the instruction clearly.
-   - 9-10 (Mastered): Integrated instruction naturally and creatively.
+   - 1-3 (Failed): Did not use the required words or concepts.
+   - 4-6 (Forced): Used the required words/concepts, but they felt out of place or confusing.
+   - 7-8 (Met): Followed instructions correctly.
+   - 9-10 (Mastered): Integrated the required word/concept so naturally that a child would understand it easily.
 
 Please provide your general assessment about the part written by the student based on the guidelines above.
 1.  Is it grammatically correct?
@@ -384,7 +384,7 @@ def main():
                 top_k=args.top_k,
             )
 
-            completion.replace("<|endoftext|>", "")
+            completion = completion.replace("<|endoftext|>", "")
 
             evaluation_text = evaluate_with_gemini(prompt_data, completion)
 
@@ -394,7 +394,7 @@ def main():
                 f.write(f"Instruction Type: {prompt_data['instruction_type']}\n")
                 f.write(f"Instruction Content: {prompt_data['instruction_content']}\n")
                 f.write(f"Story Beginning: {prompt_data['story_beginning']}\n")
-                f.write(f"Model Completion:\n{completion}\n")
+                f.write(f"Model Completion:\n{completion.split("***")[-1]}\n")
                 f.write(f"Evaluation:\n{evaluation_text}\n")
                 f.write("-" * 40 + "\n\n")
 
