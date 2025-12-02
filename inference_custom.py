@@ -110,10 +110,10 @@ if __name__ == "__main__":
 
     test_sentences = [
         "Once upon a time there was a pumpkin.",
-        # "A little girl went to the woods",
-        # "A boy told his sister a bedtime story about a flying cat",
-        # "The kids sat in a circle while Uncle narrated a story about a brave knight",
-        # "Dad was telling the kids an adventure tale about a pirate ship",
+        "A little girl went to the woods",
+        "A boy told his sister a bedtime story about a flying cat",
+        "The kids sat in a circle while Uncle narrated a story about a brave knight",
+        "Dad was telling the kids an adventure tale about a pirate ship",
     ]
 
     for k, test_sentence in enumerate(test_sentences):

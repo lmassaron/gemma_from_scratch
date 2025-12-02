@@ -7,3 +7,5 @@ tqdm
 protobuf
 tensorboard
 matplotlib
+google-generativeai
+pandas
