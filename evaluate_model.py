@@ -41,7 +41,7 @@ Instruction: [Generated Content]
 
 PROMPT_GENERATION_TEMPLATE = """
 You are a creative assistant. Based on the instruction provided, generate a compatible, creative story beginning for a children's story.
-The story beginning should be a short paragraph that sets a scene and ends mid-sentence, marked by "***".
+The story beginning should be a short paragraph (no more than 100 words) that sets a scene and ends mid-sentence, marked by "***".
 
 Instruction Type: {instruction_type}
 Instruction: {instruction_content}
@@ -60,10 +60,46 @@ Instruction: {instruction_content}
 
 ***STORY***
 The symbol *** marks the separator between the prescribed beginning and the student’s completion.
-{story_beginning}***{model_completion}
+{story_beginning}***
+
+Here is the story as completed by the student:
+{model_completion}
 
 ***ASSESSMENT***
-Please provide your general assessment about the part written by the student.
+***SCORING GUIDELINES***
+Use the following guide to assign scores (0-10):
+
+1. Grammar & Mechanics
+   - 1-3 (Poor): Frequent errors make the text difficult to read.
+   - 4-6 (Fair): Readable, but contains noticeable errors.
+   - 7-8 (Good): Mostly correct with only minor errors.
+   - 9-10 (Excellent): Flawless grammar; sophisticated structure.
+
+2. Creativity
+   - 1-3 (Poor): Dull, repetitive, or minimal effort.
+   - 4-6 (Fair): Predictable or cliché.
+   - 7-8 (Good): Engaging details and interesting choices.
+   - 9-10 (Excellent): Unique voice; vivid imagery; original.
+
+3. Consistency (with Beginning)
+   - 1-3 (Poor): Contradicts the beginning facts or tone.
+   - 4-6 (Fair): Loosely connected; jarring shift in style.
+   - 7-8 (Good): Follows established logic and characters.
+   - 9-10 (Excellent): Seamless transition matching the original text.
+
+4. Plot Coherence
+   - 1-3 (Poor): No logical sequence; confusing.
+   - 4-6 (Fair): Events happen, but pacing is off or ending is weak.
+   - 7-8 (Good): Clear beginning, middle, and end.
+   - 9-10 (Excellent): Well-paced arc with satisfying resolution.
+
+5. Instruction Following
+   - 1-3 (Failed): Ignored the instruction.
+   - 4-6 (Partial): Misunderstood or weakly executed.
+   - 7-8 (Met): Followed the instruction clearly.
+   - 9-10 (Mastered): Integrated instruction naturally and creatively.
+
+Please provide your general assessment about the part written by the student based on the guidelines above.
 1.  Is it grammatically correct?
 2.  Is the plot coherent and does it make sense?
 3.  Is it consistent with the beginning of the story?
@@ -239,7 +275,7 @@ def main():
     parser.add_argument(
         "--max_new_tokens",
         type=int,
-        default=2048,
+        default=4096,
         help="Maximum number of new tokens to generate.",
     )
     parser.add_argument(
@@ -347,6 +383,8 @@ def main():
                 temperature=args.temperature,
                 top_k=args.top_k,
             )
+
+            completion.replace("<|endoftext|>", "")
 
             evaluation_text = evaluate_with_gemini(prompt_data, completion)
 
