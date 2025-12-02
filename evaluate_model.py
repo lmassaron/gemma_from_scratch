@@ -12,10 +12,10 @@ import argparse
 import tiktoken
 import google.generativeai as genai
 import pandas as pd
-import random
 from tqdm import tqdm
 from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
+
 
 # --- Configuration ---
 def main():
@@ -60,7 +60,7 @@ def main():
     )
 
     args = parser.parse_args()
-    
+
     # Print the parameters at the beginning of the script
     print("--- Script Parameters ---")
     print(f"Model Name: {args.model_path}")
@@ -76,7 +76,9 @@ def main():
         torch.cuda.manual_seed_all(args.seed)
 
     # Setup logging
-    log_filename = f"evaluation_log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+    log_filename = (
+        f"evaluation_log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+    )
     print(f"Logging evaluation details to: {log_filename}")
 
     prompts_to_use = generate_prompts_with_instructions(args.num_prompts)
@@ -91,7 +93,7 @@ def main():
     checkpoint = torch.load(
         args.model_path, map_location=torch.device(device), weights_only=True
     )
-    
+
     state_dict = {}
     for key, value in checkpoint.items():
         if key.startswith("_orig_mod."):
@@ -99,7 +101,7 @@ def main():
             state_dict[new_key] = value
         else:
             state_dict[key] = value
-            
+
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -108,10 +110,14 @@ def main():
     score_keys = ["grammar", "creativity", "consistency", "plot", "instruct"]
     for i, prompt_data in enumerate(tqdm(prompts_to_use, desc="Evaluating Prompts")):
         prompt_scores = {key: [] for key in score_keys}
-        
+
         generation_prompt = format_generation_prompt(prompt_data)
 
-        for j in tqdm(range(GENERATIONS_PER_PROMPT), desc=f"Prompt {i+1} Completions", leave=False):
+        for j in tqdm(
+            range(GENERATIONS_PER_PROMPT),
+            desc=f"Prompt {i + 1} Completions",
+            leave=False,
+        ):
             completion = generate(
                 generation_prompt,
                 model,
@@ -126,7 +132,7 @@ def main():
 
             # Log the details
             with open(log_filename, "a", encoding="utf-8") as f:
-                f.write(f"--- Prompt {i+1}, Generation {j+1} ---")
+                f.write(f"--- Prompt {i + 1}, Generation {j + 1} ---")
                 f.write(f"Instruction Type: {prompt_data['instruction_type']}")
                 f.write(f"Instruction Content: {prompt_data['instruction_content']}")
                 f.write(f"Story Beginning: {prompt_data['story_beginning']}")
@@ -140,39 +146,37 @@ def main():
                 for key in score_keys:
                     prompt_scores[key].append(scores[key])
             else:
-                tqdm.write(f"    Warning: Failed to parse evaluation from Gemini for prompt {i+1}, completion {j+1}.")
-        
-        result_row = {"prompt": prompt_data['story_beginning']}
+                tqdm.write(
+                    f"    Warning: Failed to parse evaluation from Gemini for prompt {i + 1}, completion {j + 1}."
+                )
+
+        result_row = {"prompt": prompt_data["story_beginning"]}
         for key in score_keys:
-            avg_score = sum(prompt_scores[key]) / len(prompt_scores[key]) if prompt_scores[key] else 0
+            avg_score = (
+                sum(prompt_scores[key]) / len(prompt_scores[key])
+                if prompt_scores[key]
+                else 0
+            )
             result_row[f"avg_{key}"] = avg_score
         results.append(result_row)
 
-    print("
---- Evaluation Summary ---")
+    print("--- Evaluation Summary ---")
     df = pd.DataFrame(results)
-    pd.set_option('display.max_colwidth', 80)
+    pd.set_option("display.max_colwidth", 80)
     print(df)
 
-    print("
---- Overall Average Scores ---")
+    print("--- Overall Average Scores ---")
 
     with open(log_filename, "a", encoding="utf-8") as f:
-        f.write("
---- Evaluation Summary ---
-")
+        f.write("--- Evaluation Summary ---")
         f.write(df.to_string())
-        f.write("
-
---- Overall Average Scores ---
-")
+        f.write("--- Overall Average Scores ---")
 
     for key in score_keys:
-        avg_val = df[f'avg_{key}'].mean()
+        avg_val = df[f"avg_{key}"].mean()
         print(f"{key.capitalize()}: {avg_val:.2f}")
         with open(log_filename, "a", encoding="utf-8") as f:
-            f.write(f"{key.capitalize()}: {avg_val:.2f}
-")
+            f.write(f"{key.capitalize()}: {avg_val:.2f}")
 
 
 if __name__ == "__main__":
@@ -184,7 +188,7 @@ GEMINI_MODEL = "gemini-2.5-flash"
 GENERATIONS_PER_PROMPT = 10  # As per the paper
 
 # --- Tokenizer ---
-enc = tiktoken.get_encoding ("gpt2")
+enc = tiktoken.get_encoding("gpt2")
 
 # --- Prompt Generation Templates ---
 
@@ -241,42 +245,62 @@ Plot: [score]/10
 Instruct: [score]/10
 """
 
+
 def generate_prompts_with_instructions(num_prompts):
     """Generates a set of prompts, each with a randomly assigned instruction."""
     print(f"Generating {num_prompts} prompts with instructions using Gemini...")
     model = genai.GenerativeModel(GEMINI_MODEL)
     prompts = []
-    
-    possible_features = ["dialogue", "bad ending", "moral value", "plot twist", "foreshadowing", "conflict"]
+
+    possible_features = [
+        "dialogue",
+        "bad ending",
+        "moral value",
+        "plot twist",
+        "foreshadowing",
+        "conflict",
+    ]
 
     for i in tqdm(range(num_prompts), desc="Generating Prompts"):
         # 1. Generate a random instruction
         features_str = ", ".join(possible_features)
-        instruction_prompt = INSTRUCTION_GENERATION_TEMPLATE.format(features=features_str)
+        instruction_prompt = INSTRUCTION_GENERATION_TEMPLATE.format(
+            features=features_str
+        )
         response = model.generate_content(instruction_prompt)
-        
+
         try:
-            instruction_type = re.search(r"Instruction Type: (.*)", response.text).group(1).strip()
-            instruction_content = re.search(r"Instruction: (.*)", response.text, re.DOTALL).group(1).strip()
+            instruction_type = (
+                re.search(r"Instruction Type: (.*)", response.text).group(1).strip()
+            )
+            instruction_content = (
+                re.search(r"Instruction: (.*)", response.text, re.DOTALL)
+                .group(1)
+                .strip()
+            )
         except AttributeError:
-            tqdm.write(f"    Warning: Could not parse instruction from Gemini. Skipping prompt {i+1}.")
+            tqdm.write(
+                f"    Warning: Could not parse instruction from Gemini. Skipping prompt {i + 1}."
+            )
             continue
 
         # 2. Generate a compatible story beginning
         prompt_generation_prompt = PROMPT_GENERATION_TEMPLATE.format(
-            instruction_type=instruction_type,
-            instruction_content=instruction_content
+            instruction_type=instruction_type, instruction_content=instruction_content
         )
         response = model.generate_content(prompt_generation_prompt)
         story_beginning = response.text.strip()
 
-        prompts.append({
-            "instruction_type": instruction_type,
-            "instruction_content": instruction_content,
-            "story_beginning": story_beginning
-        })
+        prompts.append(
+            {
+                "instruction_type": instruction_type,
+                "instruction_content": instruction_content,
+                "story_beginning": story_beginning,
+            }
+        )
 
     return prompts
+
 
 def format_generation_prompt(prompt_data):
     """Formats the prompt to be fed into the local model, including instructions."""
@@ -287,6 +311,7 @@ def format_generation_prompt(prompt_data):
         f"Here is the beginning of the story:\n"
         f"{prompt_data['story_beginning']}"
     )
+
 
 def generate(
     sentence, model, tokenizer, device, max_new_tokens=200, temperature=1.0, top_k=None
@@ -307,31 +332,44 @@ def generate(
 
     return tokenizer.decode(y.squeeze().tolist())
 
+
 def evaluate_with_gemini(prompt_data, model_completion):
     """Evaluates the model's completion using the Gemini API."""
     prompt = EVALUATION_PROMPT_TEMPLATE.format(
-        instruction_type=prompt_data['instruction_type'],
-        instruction_content=prompt_data['instruction_content'],
-        story_beginning=prompt_data['story_beginning'],
-        model_completion=model_completion
+        instruction_type=prompt_data["instruction_type"],
+        instruction_content=prompt_data["instruction_content"],
+        story_beginning=prompt_data["story_beginning"],
+        model_completion=model_completion,
     )
     model = genai.GenerativeModel(GEMINI_MODEL)
     response = model.generate_content(prompt)
     return response.text
 
+
 def parse_evaluation(evaluation_text):
     """Parses the evaluation text from Gemini to extract scores."""
     try:
         scores = {
-            "grammar": float(re.search(r"Grammar: (\d+(\.\d+)?)/10", evaluation_text).group(1)),
-            "creativity": float(re.search(r"Creativity: (\d+(\.\d+)?)/10", evaluation_text).group(1)),
-            "consistency": float(re.search(r"Consistency: (\d+(\.\d+)?)/10", evaluation_text).group(1)),
-            "plot": float(re.search(r"Plot: (\d+(\.\d+)?)/10", evaluation_text).group(1)),
-            "instruct": float(re.search(r"Instruct: (\d+(\.\d+)?)/10", evaluation_text).group(1)),
+            "grammar": float(
+                re.search(r"Grammar: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+            ),
+            "creativity": float(
+                re.search(r"Creativity: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+            ),
+            "consistency": float(
+                re.search(r"Consistency: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+            ),
+            "plot": float(
+                re.search(r"Plot: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+            ),
+            "instruct": float(
+                re.search(r"Instruct: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+            ),
         }
         return scores
     except AttributeError:
         return None
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -381,7 +419,9 @@ def main():
         torch.cuda.manual_seed_all(args.seed)
 
     # Setup logging
-    log_filename = f"evaluation_log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+    log_filename = (
+        f"evaluation_log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+    )
     print(f"Logging evaluation details to: {log_filename}")
 
     prompts_to_use = generate_prompts_with_instructions(args.num_prompts)
@@ -396,7 +436,7 @@ def main():
     checkpoint = torch.load(
         args.model_path, map_location=torch.device(device), weights_only=True
     )
-    
+
     state_dict = {}
     for key, value in checkpoint.items():
         if key.startswith("_orig_mod."):
@@ -404,7 +444,7 @@ def main():
             state_dict[new_key] = value
         else:
             state_dict[key] = value
-            
+
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -413,10 +453,14 @@ def main():
     score_keys = ["grammar", "creativity", "consistency", "plot", "instruct"]
     for i, prompt_data in enumerate(tqdm(prompts_to_use, desc="Evaluating Prompts")):
         prompt_scores = {key: [] for key in score_keys}
-        
+
         generation_prompt = format_generation_prompt(prompt_data)
 
-        for j in tqdm(range(GENERATIONS_PER_PROMPT), desc=f"Prompt {i+1} Completions", leave=False):
+        for j in tqdm(
+            range(GENERATIONS_PER_PROMPT),
+            desc=f"Prompt {i + 1} Completions",
+            leave=False,
+        ):
             completion = generate(
                 generation_prompt,
                 model,
@@ -431,7 +475,7 @@ def main():
 
             # Log the details
             with open(log_filename, "a", encoding="utf-8") as f:
-                f.write(f"--- Prompt {i+1}, Generation {j+1} ---\n")
+                f.write(f"--- Prompt {i + 1}, Generation {j + 1} ---\n")
                 f.write(f"Instruction Type: {prompt_data['instruction_type']}\n")
                 f.write(f"Instruction Content: {prompt_data['instruction_content']}\n")
                 f.write(f"Story Beginning: {prompt_data['story_beginning']}\n")
@@ -445,17 +489,23 @@ def main():
                 for key in score_keys:
                     prompt_scores[key].append(scores[key])
             else:
-                tqdm.write(f"    Warning: Failed to parse evaluation from Gemini for prompt {i+1}, completion {j+1}.")
-        
-        result_row = {"prompt": prompt_data['story_beginning']}
+                tqdm.write(
+                    f"    Warning: Failed to parse evaluation from Gemini for prompt {i + 1}, completion {j + 1}."
+                )
+
+        result_row = {"prompt": prompt_data["story_beginning"]}
         for key in score_keys:
-            avg_score = sum(prompt_scores[key]) / len(prompt_scores[key]) if prompt_scores[key] else 0
+            avg_score = (
+                sum(prompt_scores[key]) / len(prompt_scores[key])
+                if prompt_scores[key]
+                else 0
+            )
             result_row[f"avg_{key}"] = avg_score
         results.append(result_row)
 
     print("\n--- Evaluation Summary ---")
     df = pd.DataFrame(results)
-    pd.set_option('display.max_colwidth', 80)
+    pd.set_option("display.max_colwidth", 80)
     print(df)
 
     print("\n--- Overall Average Scores ---")
@@ -466,7 +516,7 @@ def main():
         f.write("\n\n--- Overall Average Scores ---\n")
 
     for key in score_keys:
-        avg_val = df[f'avg_{key}'].mean()
+        avg_val = df[f"avg_{key}"].mean()
         print(f"{key.capitalize()}: {avg_val:.2f}")
         with open(log_filename, "a", encoding="utf-8") as f:
             f.write(f"{key.capitalize()}: {avg_val:.2f}\n")

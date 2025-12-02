@@ -1,12 +1,11 @@
-import torch
-from gemma_scratch.model import Gemma3Model, TransformerBlock
+from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
-from gemma_scratch.normalization import RMSNorm
-from gemma_scratch.layers import GroupedQueryAttention, FeedForward
+
 
 def count_parameters(module):
     """Counts the total number of trainable parameters in a given PyTorch module."""
     return sum(p.numel() for p in module.parameters() if p.requires_grad)
+
 
 def print_parameter_breakdown(model):
     """
@@ -35,48 +34,61 @@ def print_parameter_breakdown(model):
     if model.blocks:
         first_block = model.blocks[0]
         num_blocks = len(model.blocks)
-        
+
         # Parameters for GroupedQueryAttention (linear layers only)
-        single_att_linear_params = count_parameters(first_block.att.W_query) + \
-                                   count_parameters(first_block.att.W_key) + \
-                                   count_parameters(first_block.att.W_value) + \
-                                   count_parameters(first_block.att.out_proj)
-        
+        single_att_linear_params = (
+            count_parameters(first_block.att.W_query)
+            + count_parameters(first_block.att.W_key)
+            + count_parameters(first_block.att.W_value)
+            + count_parameters(first_block.att.out_proj)
+        )
+
         # Parameters for q_norm and k_norm within a single Attention module
         single_att_q_norm_params = count_parameters(first_block.att.q_norm)
         single_att_k_norm_params = count_parameters(first_block.att.k_norm)
-        
+
         # Parameters for FeedForward module in a single block
         single_mlp_params = count_parameters(first_block.ff)
 
         # Parameters for the 4 RMSNorms directly within a single TransformerBlock
-        single_block_direct_ln_params = count_parameters(first_block.input_layernorm) + \
-                                        count_parameters(first_block.post_attention_layernorm) + \
-                                        count_parameters(first_block.pre_feedforward_layernorm) + \
-                                        count_parameters(first_block.post_feedforward_layernorm)
-        
+        single_block_direct_ln_params = (
+            count_parameters(first_block.input_layernorm)
+            + count_parameters(first_block.post_attention_layernorm)
+            + count_parameters(first_block.pre_feedforward_layernorm)
+            + count_parameters(first_block.post_feedforward_layernorm)
+        )
+
         # Accumulate totals across all blocks
         params["Multi-head Attention (Total)"] += single_att_linear_params * num_blocks
         params["Multi-layer Perceptron (Total)"] += single_mlp_params * num_blocks
-        
-        params["Layer Normalization (Total)"] += single_block_direct_ln_params * num_blocks # 4 RMSNorms per block
-        params["Layer Normalization (Total)"] += (single_att_q_norm_params + single_att_k_norm_params) * num_blocks # 2 RMSNorms per attention module in each block
+
+        params["Layer Normalization (Total)"] += (
+            single_block_direct_ln_params * num_blocks
+        )  # 4 RMSNorms per block
+        params["Layer Normalization (Total)"] += (
+            single_att_q_norm_params + single_att_k_norm_params
+        ) * num_blocks  # 2 RMSNorms per attention module in each block
 
         # Calculate single block total for display
-        params["Transformer Block (Single)"] = single_att_linear_params + \
-                                              single_att_q_norm_params + \
-                                              single_att_k_norm_params + \
-                                              single_mlp_params + \
-                                              single_block_direct_ln_params
+        params["Transformer Block (Single)"] = (
+            single_att_linear_params
+            + single_att_q_norm_params
+            + single_att_k_norm_params
+            + single_mlp_params
+            + single_block_direct_ln_params
+        )
 
     # --- Print the Results ---
     print("--- Model Parameter Breakdown ---")
     total_calculated = 0
-    
+
     print_order = [
-        "Embedding Layer", "Output Layer", "Multi-head Attention (Total)", 
-        "Multi-layer Perceptron (Total)", "Layer Normalization (Total)",
-        "Transformer Block (Single)"
+        "Embedding Layer",
+        "Output Layer",
+        "Multi-head Attention (Total)",
+        "Multi-layer Perceptron (Total)",
+        "Layer Normalization (Total)",
+        "Transformer Block (Single)",
     ]
 
     for name in print_order:
@@ -84,11 +96,11 @@ def print_parameter_breakdown(model):
             count = params[name]
             if "Single" not in name:
                 total_calculated += count
-            
+
             count_str = f"{count:12,}"
             if name == "Output Layer" and is_weight_tied:
                 count_str = " (Tied with Embedding)"
-            
+
             print(f"{name:<32}: {count_str}")
 
     print("-" * 46)
@@ -99,13 +111,19 @@ def print_parameter_breakdown(model):
 
     if total_model_params != total_calculated:
         print("\nWarning: Discrepancy detected!\n")
-        print(f"The calculated sum ({total_calculated:,}) does not match the model\'s total ({total_model_params:,}).")
-        print("This might be due to minor discrepancies in how sub-modules are reported or floating-point arithmetic.")
+        print(
+            f"The calculated sum ({total_calculated:,}) does not match the model's total ({total_model_params:,})."
+        )
+        print(
+            "This might be due to minor discrepancies in how sub-modules are reported or floating-point arithmetic."
+        )
     else:
         print("\nVerification successful: Sum of components matches the total.")
 
 
 if __name__ == "__main__":
     gemma_model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
-    gemma_model.out_head.weight = gemma_model.tok_emb.weight # Ensure weight tying for accurate count
+    gemma_model.out_head.weight = (
+        gemma_model.tok_emb.weight
+    )  # Ensure weight tying for accurate count
     print_parameter_breakdown(gemma_model)

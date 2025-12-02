@@ -1,8 +1,8 @@
-
 import argparse
 import os
 import numpy as np
 from gemma_scratch.tokenizer import get_gpt2_tokenizer
+
 
 def count_tokens(data_dir, batch_size, sequence_length):
     """
@@ -28,10 +28,9 @@ def count_tokens(data_dir, batch_size, sequence_length):
         else:
             print(f"Could not find {data_path}")
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Count tokens in a dataset."
-    )
+    parser = argparse.ArgumentParser(description="Count tokens in a dataset.")
     parser.add_argument(
         "--data_dir",
         type=str,

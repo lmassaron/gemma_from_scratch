@@ -113,7 +113,7 @@ def download_tokenizer_if_needed(repo_id: str, local_dir: Path) -> Path:
             print("Download complete.")
         except (IOError, ValueError) as e:
             print(f"Warning: Failed to download tokenizer.json: {e}", file=sys.stderr)
-            print(f"Attemping to load it from a fallback repository")
+            print("Attemping to load it from a fallback repository")
             try:
                 fallback_repo_id = "lmassaron/gemma-3-4b-finsentiment"
                 hf_hub_download(
