@@ -6,6 +6,7 @@ on grammar, creativity, and consistency, inspired by the GPT-Eval paper.
 
 import os
 import re
+import datetime
 import torch
 import argparse
 import tiktoken
@@ -17,6 +18,166 @@ from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
 # --- Configuration ---
+def main():
+    parser = argparse.ArgumentParser(
+        description="Evaluate a trained Gemma model using Gemini."
+    )
+    parser.add_argument(
+        "--model_path",
+        type=str,
+        required=True,
+        help="Path to the saved model parameters (.pt file).",
+    )
+    parser.add_argument(
+        "--num_prompts",
+        type=int,
+        default=50,
+        help="Number of prompts with instructions to generate for the evaluation. Default: 50.",
+    )
+    parser.add_argument(
+        "--max_new_tokens",
+        type=int,
+        default=2048,
+        help="Maximum number of new tokens to generate.",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=1.0,
+        help="Controls randomness for generation.",
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=None,
+        help="Sample from the top K most likely tokens.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility.",
+    )
+
+    args = parser.parse_args()
+    
+    # Print the parameters at the beginning of the script
+    print("--- Script Parameters ---")
+    print(f"Model Name: {args.model_path}")
+    print(f"Temperature: {args.temperature}")
+    print(f"Max Tokens: {args.max_new_tokens}")
+    print(f"Top K: {args.top_k}")
+    print(f"Seed: {args.seed}")
+    print(f"LLM Judge: {GEMINI_MODEL}")
+    print("-------------------------")
+
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
+
+    # Setup logging
+    log_filename = f"evaluation_log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+    print(f"Logging evaluation details to: {log_filename}")
+
+    prompts_to_use = generate_prompts_with_instructions(args.num_prompts)
+    if not prompts_to_use:
+        print("No prompts were generated. Exiting.")
+        return
+
+    model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
+    checkpoint = torch.load(
+        args.model_path, map_location=torch.device(device), weights_only=True
+    )
+    
+    state_dict = {}
+    for key, value in checkpoint.items():
+        if key.startswith("_orig_mod."):
+            new_key = key.replace("_orig_mod.", "")
+            state_dict[new_key] = value
+        else:
+            state_dict[key] = value
+            
+    model.load_state_dict(state_dict)
+    model.to(device)
+    model.eval()
+
+    results = []
+    score_keys = ["grammar", "creativity", "consistency", "plot", "instruct"]
+    for i, prompt_data in enumerate(tqdm(prompts_to_use, desc="Evaluating Prompts")):
+        prompt_scores = {key: [] for key in score_keys}
+        
+        generation_prompt = format_generation_prompt(prompt_data)
+
+        for j in tqdm(range(GENERATIONS_PER_PROMPT), desc=f"Prompt {i+1} Completions", leave=False):
+            completion = generate(
+                generation_prompt,
+                model,
+                enc,
+                device,
+                max_new_tokens=args.max_new_tokens,
+                temperature=args.temperature,
+                top_k=args.top_k,
+            )
+
+            evaluation_text = evaluate_with_gemini(prompt_data, completion)
+
+            # Log the details
+            with open(log_filename, "a", encoding="utf-8") as f:
+                f.write(f"--- Prompt {i+1}, Generation {j+1} ---")
+                f.write(f"Instruction Type: {prompt_data['instruction_type']}")
+                f.write(f"Instruction Content: {prompt_data['instruction_content']}")
+                f.write(f"Story Beginning: {prompt_data['story_beginning']}")
+                f.write(f"Model Completion: {completion}")
+                f.write(f"Evaluation: {evaluation_text}")
+                f.write("-" * 40 + " ")
+
+            scores = parse_evaluation(evaluation_text)
+
+            if scores:
+                for key in score_keys:
+                    prompt_scores[key].append(scores[key])
+            else:
+                tqdm.write(f"    Warning: Failed to parse evaluation from Gemini for prompt {i+1}, completion {j+1}.")
+        
+        result_row = {"prompt": prompt_data['story_beginning']}
+        for key in score_keys:
+            avg_score = sum(prompt_scores[key]) / len(prompt_scores[key]) if prompt_scores[key] else 0
+            result_row[f"avg_{key}"] = avg_score
+        results.append(result_row)
+
+    print("
+--- Evaluation Summary ---")
+    df = pd.DataFrame(results)
+    pd.set_option('display.max_colwidth', 80)
+    print(df)
+
+    print("
+--- Overall Average Scores ---")
+
+    with open(log_filename, "a", encoding="utf-8") as f:
+        f.write("
+--- Evaluation Summary ---
+")
+        f.write(df.to_string())
+        f.write("
+
+--- Overall Average Scores ---
+")
+
+    for key in score_keys:
+        avg_val = df[f'avg_{key}'].mean()
+        print(f"{key.capitalize()}: {avg_val:.2f}")
+        with open(log_filename, "a", encoding="utf-8") as f:
+            f.write(f"{key.capitalize()}: {avg_val:.2f}
+")
+
+
+if __name__ == "__main__":
+    main()
+
 # Ensure you have your key set as an environment variable
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -191,7 +352,7 @@ def main():
     parser.add_argument(
         "--max_new_tokens",
         type=int,
-        default=200,
+        default=2048,
         help="Maximum number of new tokens to generate.",
     )
     parser.add_argument(
@@ -218,6 +379,10 @@ def main():
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
+
+    # Setup logging
+    log_filename = f"evaluation_log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+    print(f"Logging evaluation details to: {log_filename}")
 
     prompts_to_use = generate_prompts_with_instructions(args.num_prompts)
     if not prompts_to_use:
@@ -263,6 +428,17 @@ def main():
             )
 
             evaluation_text = evaluate_with_gemini(prompt_data, completion)
+
+            # Log the details
+            with open(log_filename, "a", encoding="utf-8") as f:
+                f.write(f"--- Prompt {i+1}, Generation {j+1} ---\n")
+                f.write(f"Instruction Type: {prompt_data['instruction_type']}\n")
+                f.write(f"Instruction Content: {prompt_data['instruction_content']}\n")
+                f.write(f"Story Beginning: {prompt_data['story_beginning']}\n")
+                f.write(f"Model Completion:\n{completion}\n")
+                f.write(f"Evaluation:\n{evaluation_text}\n")
+                f.write("-" * 40 + "\n\n")
+
             scores = parse_evaluation(evaluation_text)
 
             if scores:
@@ -283,8 +459,17 @@ def main():
     print(df)
 
     print("\n--- Overall Average Scores ---")
+
+    with open(log_filename, "a", encoding="utf-8") as f:
+        f.write("\n--- Evaluation Summary ---\n")
+        f.write(df.to_string())
+        f.write("\n\n--- Overall Average Scores ---\n")
+
     for key in score_keys:
-        print(f"{key.capitalize()}: {df[f'avg_{key}'].mean():.2f}")
+        avg_val = df[f'avg_{key}'].mean()
+        print(f"{key.capitalize()}: {avg_val:.2f}")
+        with open(log_filename, "a", encoding="utf-8") as f:
+            f.write(f"{key.capitalize()}: {avg_val:.2f}\n")
 
 
 if __name__ == "__main__":
