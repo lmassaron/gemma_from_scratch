@@ -1,0 +1,81 @@
+"""configuration file"""
+
+import jax.numpy as jnp
+
+GEMMA3_CONFIG_CUSTOM = {
+    "vocab_size": 50257,
+    "context_length": 32_768,
+    "emb_dim": 640,
+    "n_heads": 4,
+    "n_layers": 18,
+    "hidden_dim": 2048,
+    "head_dim": 256,
+    "qk_norm": True,
+    "n_kv_groups": 1,
+    "rope_local_base": 10_000.0,
+    "rope_base": 1_000_000.0,
+    "sliding_window": 512,
+    "layer_types": [
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "full_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "full_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "full_attention",
+    ],
+    "dtype": jnp.bfloat16,
+    "query_pre_attn_scalar": 256,
+}
+
+# see https://github.com/google/gemma.cpp/blob/3ed403e28707c0e3eb5f48b0e487b63a446d8e2e/gemma/configs.cc#L402
+GEMMA3_CONFIG_270M = {
+    "vocab_size": 262_144,
+    "context_length": 32_768,
+    "emb_dim": 640,
+    "n_heads": 4,
+    "n_layers": 18,
+    "hidden_dim": 2048,
+    "head_dim": 256,
+    "qk_norm": True,
+    "n_kv_groups": 1,
+    "rope_local_base": 10_000.0,
+    "rope_base": 1_000_000.0,
+    "sliding_window": 512,
+    "layer_types": [
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "full_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "full_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "sliding_attention",
+        "full_attention",
+    ],
+    "dtype": jnp.bfloat16,
+    "query_pre_attn_scalar": 256,
+}
+
+if __name__ == "__main__":
+    pass

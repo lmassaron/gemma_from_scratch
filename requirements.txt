@@ -9,3 +9,7 @@ tensorboard
 matplotlib
 google-generativeai
 pandas
+jax
+jaxlib
+flax
+optax
