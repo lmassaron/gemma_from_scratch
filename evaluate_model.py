@@ -17,8 +17,8 @@ from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
 # --- Configuration ---
-# Ensure you have your GEMINI_API_KEY set as an environment variable
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+# Ensure you have your key set as an environment variable
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 GEMINI_MODEL = "gemini-2.5-flash"
 GENERATIONS_PER_PROMPT = 10  # As per the paper
 

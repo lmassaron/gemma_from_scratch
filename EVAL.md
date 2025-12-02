@@ -8,7 +8,7 @@ The `evaluate_model.py` script automates the evaluation of your model's story-ge
 
 1.  **Instruction & Prompt Generation**: The script begins by using the Gemini API to generate a set of evaluation scenarios. By default, it generates 50 scenarios. Each scenario consists of a random instruction and a compatible story beginning.
 2.  **Story Completion**: For each scenario, the script feeds the instruction and the story beginning to your trained model, which then generates multiple story completions (10 by default).
-3.  **LLM-based Evaluation**: Each generated completion is sent to the Gemini API (`gemini-1.5-flash`) for evaluation against the initial instruction and story beginning.
+3.  **LLM-based Evaluation**: Each generated completion is sent to the Gemini API (`gemini-2.5-flash`) for evaluation against the initial instruction and story beginning.
 4.  **Scoring**: Gemini grades the completion based on five key dimensions.
 5.  **Summarization**: The script calculates the average score for each dimension across all completions for a given prompt, and then provides an overall average for the entire evaluation run.
 
