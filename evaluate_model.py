@@ -7,8 +7,8 @@ on grammar, creativity, and consistency, inspired by the GPT-Eval paper.
 import os
 import re
 import datetime
-import torch
 import argparse
+import torch
 import tiktoken
 import google.generativeai as genai
 import pandas as pd
@@ -110,7 +110,8 @@ def generate_prompts_with_instructions(num_prompts):
             )
         except (AttributeError, ValueError, Exception) as e:
             tqdm.write(
-                f"    Warning: Could not parse instruction from Gemini or error in generation ({e}). Skipping prompt {i + 1}."
+                "    Warning: Could not parse instruction from Gemini or "
+                f"error in generation ({e}). Skipping prompt {i + 1}."
             )
             continue
 
@@ -218,6 +219,7 @@ def parse_evaluation(evaluation_text):
 
 
 def main():
+    """Main execution procedure"""
     parser = argparse.ArgumentParser(
         description="Evaluate a trained Gemma model using Gemini."
     )
