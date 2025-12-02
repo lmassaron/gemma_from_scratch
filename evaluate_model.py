@@ -1,5 +1,5 @@
 """
-"This script evaluates a trained Gemma model using the Gemini API for LLM-based evaluation.
+This script evaluates a trained Gemma model using the Gemini API for LLM-based evaluation.
 It generates text completions for a set of prompts and then uses Gemini to score them
 on grammar, creativity, and consistency, inspired by the GPT-Eval paper.
 """
@@ -18,177 +18,8 @@ from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
 
 # --- Configuration ---
-def main():
-    parser = argparse.ArgumentParser(
-        description="Evaluate a trained Gemma model using Gemini."
-    )
-    parser.add_argument(
-        "--model_path",
-        type=str,
-        required=True,
-        help="Path to the saved model parameters (.pt file).",
-    )
-    parser.add_argument(
-        "--num_prompts",
-        type=int,
-        default=50,
-        help="Number of prompts with instructions to generate for the evaluation. Default: 50.",
-    )
-    parser.add_argument(
-        "--max_new_tokens",
-        type=int,
-        default=2048,
-        help="Maximum number of new tokens to generate.",
-    )
-    parser.add_argument(
-        "--temperature",
-        type=float,
-        default=1.0,
-        help="Controls randomness for generation.",
-    )
-    parser.add_argument(
-        "--top_k",
-        type=int,
-        default=None,
-        help="Sample from the top K most likely tokens.",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed for reproducibility.",
-    )
-
-    args = parser.parse_args()
-
-    # Print the parameters at the beginning of the script
-    print("--- Script Parameters ---")
-    print(f"Model Name: {args.model_path}")
-    print(f"Temperature: {args.temperature}")
-    print(f"Max Tokens: {args.max_new_tokens}")
-    print(f"Top K: {args.top_k}")
-    print(f"Seed: {args.seed}")
-    print(f"LLM Judge: {GEMINI_MODEL}")
-    print("-------------------------")
-
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
-
-    # Setup logging
-    log_filename = (
-        f"evaluation_log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
-    )
-    print(f"Logging evaluation details to: {log_filename}")
-
-    prompts_to_use = generate_prompts_with_instructions(args.num_prompts)
-    if not prompts_to_use:
-        print("No prompts were generated. Exiting.")
-        return
-
-    model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
-
-    checkpoint = torch.load(
-        args.model_path, map_location=torch.device(device), weights_only=True
-    )
-
-    state_dict = {}
-    for key, value in checkpoint.items():
-        if key.startswith("_orig_mod."):
-            new_key = key.replace("_orig_mod.", "")
-            state_dict[new_key] = value
-        else:
-            state_dict[key] = value
-
-    model.load_state_dict(state_dict)
-    model.to(device)
-    model.eval()
-
-    results = []
-    score_keys = ["grammar", "creativity", "consistency", "plot", "instruct"]
-    for i, prompt_data in enumerate(tqdm(prompts_to_use, desc="Evaluating Prompts")):
-        prompt_scores = {key: [] for key in score_keys}
-
-        generation_prompt = format_generation_prompt(prompt_data)
-
-        for j in tqdm(
-            range(GENERATIONS_PER_PROMPT),
-            desc=f"Prompt {i + 1} Completions",
-            leave=False,
-        ):
-            completion = generate(
-                generation_prompt,
-                model,
-                enc,
-                device,
-                max_new_tokens=args.max_new_tokens,
-                temperature=args.temperature,
-                top_k=args.top_k,
-            )
-
-            evaluation_text = evaluate_with_gemini(prompt_data, completion)
-
-            # Log the details
-            with open(log_filename, "a", encoding="utf-8") as f:
-                f.write(f"--- Prompt {i + 1}, Generation {j + 1} ---")
-                f.write(f"Instruction Type: {prompt_data['instruction_type']}")
-                f.write(f"Instruction Content: {prompt_data['instruction_content']}")
-                f.write(f"Story Beginning: {prompt_data['story_beginning']}")
-                f.write(f"Model Completion: {completion}")
-                f.write(f"Evaluation: {evaluation_text}")
-                f.write("-" * 40 + " ")
-
-            scores = parse_evaluation(evaluation_text)
-
-            if scores:
-                for key in score_keys:
-                    prompt_scores[key].append(scores[key])
-            else:
-                tqdm.write(
-                    f"    Warning: Failed to parse evaluation from Gemini for prompt {i + 1}, completion {j + 1}."
-                )
-
-        result_row = {"prompt": prompt_data["story_beginning"]}
-        for key in score_keys:
-            avg_score = (
-                sum(prompt_scores[key]) / len(prompt_scores[key])
-                if prompt_scores[key]
-                else 0
-            )
-            result_row[f"avg_{key}"] = avg_score
-        results.append(result_row)
-
-    print("--- Evaluation Summary ---")
-    df = pd.DataFrame(results)
-    pd.set_option("display.max_colwidth", 80)
-    print(df)
-
-    print("--- Overall Average Scores ---")
-
-    with open(log_filename, "a", encoding="utf-8") as f:
-        f.write("--- Evaluation Summary ---")
-        f.write(df.to_string())
-        f.write("--- Overall Average Scores ---")
-
-    for key in score_keys:
-        avg_val = df[f"avg_{key}"].mean()
-        print(f"{key.capitalize()}: {avg_val:.2f}")
-        with open(log_filename, "a", encoding="utf-8") as f:
-            f.write(f"{key.capitalize()}: {avg_val:.2f}")
-
-
-if __name__ == "__main__":
-    main()
-
-# Ensure you have your key set as an environment variable
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 GEMINI_MODEL = "gemini-2.5-flash"
 GENERATIONS_PER_PROMPT = 10  # As per the paper
-
-# --- Tokenizer ---
-enc = tiktoken.get_encoding("gpt2")
 
 # --- Prompt Generation Templates ---
 
@@ -267,9 +98,8 @@ def generate_prompts_with_instructions(num_prompts):
         instruction_prompt = INSTRUCTION_GENERATION_TEMPLATE.format(
             features=features_str
         )
-        response = model.generate_content(instruction_prompt)
-
         try:
+            response = model.generate_content(instruction_prompt)
             instruction_type = (
                 re.search(r"Instruction Type: (.*)", response.text).group(1).strip()
             )
@@ -278,9 +108,9 @@ def generate_prompts_with_instructions(num_prompts):
                 .group(1)
                 .strip()
             )
-        except AttributeError:
+        except (AttributeError, ValueError, Exception) as e:
             tqdm.write(
-                f"    Warning: Could not parse instruction from Gemini. Skipping prompt {i + 1}."
+                f"    Warning: Could not parse instruction from Gemini or error in generation ({e}). Skipping prompt {i + 1}."
             )
             continue
 
@@ -288,8 +118,14 @@ def generate_prompts_with_instructions(num_prompts):
         prompt_generation_prompt = PROMPT_GENERATION_TEMPLATE.format(
             instruction_type=instruction_type, instruction_content=instruction_content
         )
-        response = model.generate_content(prompt_generation_prompt)
-        story_beginning = response.text.strip()
+        try:
+            response = model.generate_content(prompt_generation_prompt)
+            story_beginning = response.text.strip()
+        except Exception as e:
+            tqdm.write(
+                f"    Warning: Error generating story beginning ({e}). Skipping."
+            )
+            continue
 
         prompts.append(
             {
@@ -321,13 +157,20 @@ def generate(
         tokenizer.encode_ordinary(sentence), device=device
     ).unsqueeze(dim=0)
 
+    # tiktoken gpt2 eot token is 50256
+    eot_token = 50256
+    if hasattr(tokenizer, "eot_token"):
+        eos_id = tokenizer.eot_token
+    else:
+        eos_id = eot_token
+
     with torch.no_grad():
         y = model.generate(
             context,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             top_k=top_k,
-            eos_id=tokenizer.eot_token,
+            eos_id=eos_id,
         )
 
     return tokenizer.decode(y.squeeze().tolist())
@@ -342,8 +185,11 @@ def evaluate_with_gemini(prompt_data, model_completion):
         model_completion=model_completion,
     )
     model = genai.GenerativeModel(GEMINI_MODEL)
-    response = model.generate_content(prompt)
-    return response.text
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error evaluating: {e}"
 
 
 def parse_evaluation(evaluation_text):
@@ -414,6 +260,25 @@ def main():
 
     args = parser.parse_args()
 
+    # Configure GenAI here
+    if "GOOGLE_API_KEY" not in os.environ:
+        print("Error: GOOGLE_API_KEY environment variable not set.")
+        return
+    genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+
+    # Initialize Tokenizer
+    enc = tiktoken.get_encoding("gpt2")
+
+    # Print the parameters at the beginning of the script
+    print("--- Script Parameters ---")
+    print(f"Model Name: {args.model_path}")
+    print(f"Temperature: {args.temperature}")
+    print(f"Max Tokens: {args.max_new_tokens}")
+    print(f"Top K: {args.top_k}")
+    print(f"Seed: {args.seed}")
+    print(f"LLM Judge: {GEMINI_MODEL}")
+    print("-------------------------")
+
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
@@ -433,6 +298,11 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
+    # Safe loading
+    if not os.path.exists(args.model_path):
+        print(f"Error: Model file not found at {args.model_path}")
+        return
+
     checkpoint = torch.load(
         args.model_path, map_location=torch.device(device), weights_only=True
     )
@@ -451,11 +321,14 @@ def main():
 
     results = []
     score_keys = ["grammar", "creativity", "consistency", "plot", "instruct"]
+
+    # We loop through the generated prompts
     for i, prompt_data in enumerate(tqdm(prompts_to_use, desc="Evaluating Prompts")):
         prompt_scores = {key: [] for key in score_keys}
 
         generation_prompt = format_generation_prompt(prompt_data)
 
+        # Generate multiple completions per prompt
         for j in tqdm(
             range(GENERATIONS_PER_PROMPT),
             desc=f"Prompt {i + 1} Completions",
@@ -504,6 +377,10 @@ def main():
         results.append(result_row)
 
     print("\n--- Evaluation Summary ---")
+    if not results:
+        print("No results to show.")
+        return
+
     df = pd.DataFrame(results)
     pd.set_option("display.max_colwidth", 80)
     print(df)
@@ -516,10 +393,11 @@ def main():
         f.write("\n\n--- Overall Average Scores ---\n")
 
     for key in score_keys:
-        avg_val = df[f"avg_{key}"].mean()
-        print(f"{key.capitalize()}: {avg_val:.2f}")
-        with open(log_filename, "a", encoding="utf-8") as f:
-            f.write(f"{key.capitalize()}: {avg_val:.2f}\n")
+        if f"avg_{key}" in df.columns:
+            avg_val = df[f"avg_{key}"].mean()
+            print(f"{key.capitalize()}: {avg_val:.2f}")
+            with open(log_filename, "a", encoding="utf-8") as f:
+                f.write(f"{key.capitalize()}: {avg_val:.2f}\n")
 
 
 if __name__ == "__main__":
