@@ -18,7 +18,8 @@ from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 
 
 # --- Configuration ---
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_GENERATION_MODEL = "gemini-2.5-flash"
+GEMINI_EVALUATION_MODEL = "gemini-2.5-pro"
 GENERATIONS_PER_PROMPT = 10  # As per the paper
 
 # --- Prompt Generation Templates ---
@@ -80,7 +81,7 @@ Instruct: [score]/10
 def generate_prompts_with_instructions(num_prompts):
     """Generates a set of prompts, each with a randomly assigned instruction."""
     print(f"Generating {num_prompts} prompts with instructions using Gemini...")
-    model = genai.GenerativeModel(GEMINI_MODEL)
+    model = genai.GenerativeModel(GEMINI_GENERATION_MODEL)
     prompts = []
 
     possible_features = [
@@ -185,7 +186,7 @@ def evaluate_with_gemini(prompt_data, model_completion):
         story_beginning=prompt_data["story_beginning"],
         model_completion=model_completion,
     )
-    model = genai.GenerativeModel(GEMINI_MODEL)
+    model = genai.GenerativeModel(GEMINI_EVALUATION_MODEL)
     try:
         response = model.generate_content(prompt)
         return response.text
@@ -278,7 +279,8 @@ def main():
     print(f"Max Tokens: {args.max_new_tokens}")
     print(f"Top K: {args.top_k}")
     print(f"Seed: {args.seed}")
-    print(f"LLM Judge: {GEMINI_MODEL}")
+    print(f"LLM Generator: {GEMINI_GENERATION_MODEL}")
+    print(f"LLM Judge: {GEMINI_EVALUATION_MODEL}")
     print("-------------------------")
 
     torch.manual_seed(args.seed)
@@ -365,7 +367,8 @@ def main():
                     prompt_scores[key].append(scores[key])
             else:
                 tqdm.write(
-                    f"    Warning: Failed to parse evaluation from Gemini for prompt {i + 1}, completion {j + 1}."
+                    "    Warning: Failed to parse evaluation from Gemini "
+                    f"for prompt {i + 1}, completion {j + 1}."
                 )
 
         result_row = {"prompt": prompt_data["story_beginning"]}
