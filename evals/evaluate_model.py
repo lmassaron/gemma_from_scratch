@@ -1,7 +1,9 @@
 """
 This script evaluates a trained Gemma model using the Gemini API for LLM-based evaluation.
-It generates text completions for a set of prompts and then uses Gemini to score them
-on grammar, creativity, and consistency, inspired by the GPT-Eval paper.
+It generates text completions for a set of prompts and then uses Gemini to score them.
+Two modes are supported:
+1. Basic: Evaluates grammar, creativity, and consistency based on story completion.
+2. Instruct: Evaluates the above plus plot and instruction following.
 """
 
 import os
@@ -22,7 +24,7 @@ GEMINI_GENERATION_MODEL = "gemini-2.5-flash"
 GEMINI_EVALUATION_MODEL = "gemini-2.5-pro"
 GENERATIONS_PER_PROMPT = 10  # As per the paper
 
-# --- Prompt Generation Templates ---
+# --- INSTRUCT Mode Templates ---
 
 INSTRUCTION_GENERATION_TEMPLATE = """
 You are a creative assistant. Your task is to generate a random instruction for a language model that will write a children's story.
@@ -49,8 +51,7 @@ Instruction: {instruction_content}
 Your output must be only the story beginning paragraph, ending in "***".
 """
 
-# --- Gemini Evaluation Prompt Template ---
-EVALUATION_PROMPT_TEMPLATE = """
+EVALUATION_PROMPT_TEMPLATE_INSTRUCT = """
 The following exercise, the student is given a beginning of a story and a specific instruction. The student needs to complete it into a full story that follows the instruction.
 The exercise tests the student's language abilities, creativity, and ability to follow instructions.
 
@@ -113,8 +114,62 @@ Plot: [score]/10
 Instruct: [score]/10
 """
 
+# --- BASIC Mode Templates ---
 
-def generate_prompts_with_instructions(num_prompts):
+BASIC_STORY_GENERATION_TEMPLATE = """
+You are a creative assistant. Your task is to generate a random beginning for a children's story.
+The beginning should be a short paragraph (no more than 15 words) consisting of COMPLETE PHRASES.
+It should set a scene or introduce a character.
+
+Your output must be ONLY the story beginning text, followed immediately by "***".
+Do not include any other text or labels.
+"""
+
+EVALUATION_PROMPT_TEMPLATE_BASIC = """
+The following exercise, the student is given a beginning of a story. The student needs to complete it into a full story.
+The exercise tests the student's language abilities, creativity, and consistency.
+
+***STORY***
+The symbol *** marks the separator between the prescribed beginning and the student’s completion.
+{story_beginning}
+
+Here is the story as completed by the student:
+{model_completion}
+
+***ASSESSMENT***
+***SCORING GUIDELINES***
+Use the following guide to assign scores (0-10), keeping in mind the target audience is children who are preschoolers or in elementary school.
+
+1. Grammar & Simplified Language
+   - 1-3 (Too Complex/Broken): Grammar errors OR vocabulary is too advanced/abstract for a small child.
+   - 4-6 (Fair): Grammatically okay, but sentences are too long or convoluted.
+   - 7-8 (Good): Simple, short sentences. Easy vocabulary.
+   - 9-10 (Perfect): Flawless, simple grammar. Perfectly mimics the speech/reading level of a preschooler (Subject-Verb-Object).
+
+2. Creativity (Child-Appropriate)
+   - 1-3 (Nonsense/Dark): The story makes no sense or includes themes inappropriate for children (scary/violent).
+   - 4-6 (Boring): Very repetitive or lacks any spark of imagination.
+   - 7-8 (Charming): Cute and engaging concepts (animals, friends, toys).
+   - 9-10 (Delightful): Captures a distinct sense of whimsy or wonder; highly engaging for a toddler.
+
+3. Consistency
+   - 1-3 (Confusing): Names change, objects disappear, or the setting shifts randomly.
+   - 4-6 (Drifting): The story wanders away from the beginning premise.
+   - 7-8 (Steady): Maintains the characters and setting introduced in the beginning.
+   - 9-10 (Seamless): The completion feels exactly like the same author wrote it; perfect continuity of simple tone.
+
+Please provide your general assessment about the part written by the student based on the guidelines above.
+1.  Is it grammatically correct?
+2.  Is the story creative and appropriate for children?
+3.  Is it consistent with the beginning of the story?
+
+Now, grade the student’s completion on the following criteria. Use the specified format and nothing else.
+Grammar: [score]/10
+Creativity: [score]/10
+Consistency: [score]/10
+"""
+
+def generate_prompts_instruct(num_prompts):
     """Generates a set of prompts, each with a randomly assigned instruction."""
     print(f"Generating {num_prompts} prompts with instructions using Gemini...")
     model = genai.GenerativeModel(GEMINI_GENERATION_MODEL)
@@ -175,16 +230,48 @@ def generate_prompts_with_instructions(num_prompts):
 
     return prompts
 
+def generate_prompts_basic(num_prompts):
+    """Generates a set of basic story beginnings."""
+    print(f"Generating {num_prompts} basic story beginnings using Gemini...")
+    model = genai.GenerativeModel(GEMINI_GENERATION_MODEL)
+    prompts = []
 
-def format_generation_prompt(prompt_data):
-    """Formats the prompt to be fed into the local model, including instructions."""
-    return (
-        f"Instruction: Write a story that follows these rules:\n"
-        f"- Type: {prompt_data['instruction_type']}\n"
-        f"- Details: {prompt_data['instruction_content']}\n\n"
-        f"Here is the beginning of the story:\n"
-        f"{prompt_data['story_beginning']}"
-    )
+    for i in tqdm(range(num_prompts), desc="Generating Prompts"):
+        try:
+            response = model.generate_content(BASIC_STORY_GENERATION_TEMPLATE)
+            story_beginning = response.text.strip()
+            # Ensure it ends with ***
+            if not story_beginning.endswith("***"):
+                 story_beginning += "***"
+        except Exception as e:
+            tqdm.write(
+                f"    Warning: Error generating story beginning ({e}). Skipping."
+            )
+            continue
+
+        prompts.append(
+            {
+                "story_beginning": story_beginning,
+            }
+        )
+
+    return prompts
+
+
+def format_generation_prompt(prompt_data, mode="instruct"):
+    """Formats the prompt to be fed into the local model."""
+    if mode == "instruct":
+        return (
+            f"Instruction: Write a story that follows these rules:\n"
+            f"- Type: {prompt_data['instruction_type']}\n"
+            f"- Details: {prompt_data['instruction_content']}\n\n"
+            f"Here is the beginning of the story:\n"
+            f"{prompt_data['story_beginning']}"
+        )
+    else: # Basic mode
+        # User requested: "present to the gemma model the beginning of the story... followed by ***"
+        # The story_beginning already contains *** from generation
+        return prompt_data['story_beginning']
 
 
 def generate(
@@ -214,15 +301,23 @@ def generate(
     return tokenizer.decode(y.squeeze().tolist())
 
 
-def evaluate_with_gemini(prompt_data, model_completion):
+def evaluate_with_gemini(prompt_data, model_completion, mode="instruct"):
     """Evaluates the model's completion using the Gemini API."""
-    prompt = EVALUATION_PROMPT_TEMPLATE.format(
-        instruction_type=prompt_data["instruction_type"],
-        instruction_content=prompt_data["instruction_content"],
-        story_beginning=prompt_data["story_beginning"],
-        model_completion=model_completion,
-    )
     model = genai.GenerativeModel(GEMINI_EVALUATION_MODEL)
+    
+    if mode == "instruct":
+        prompt = EVALUATION_PROMPT_TEMPLATE_INSTRUCT.format(
+            instruction_type=prompt_data["instruction_type"],
+            instruction_content=prompt_data["instruction_content"],
+            story_beginning=prompt_data["story_beginning"],
+            model_completion=model_completion,
+        )
+    else: # Basic
+         prompt = EVALUATION_PROMPT_TEMPLATE_BASIC.format(
+            story_beginning=prompt_data["story_beginning"],
+            model_completion=model_completion,
+        )
+
     try:
         response = model.generate_content(prompt)
         return response.text
@@ -230,26 +325,18 @@ def evaluate_with_gemini(prompt_data, model_completion):
         return f"Error evaluating: {e}"
 
 
-def parse_evaluation(evaluation_text):
+def parse_evaluation(evaluation_text, mode="instruct"):
     """Parses the evaluation text from Gemini to extract scores."""
+    scores = {}
     try:
-        scores = {
-            "grammar": float(
-                re.search(r"Grammar: (\d+(\.\d+)?)/10", evaluation_text).group(1)
-            ),
-            "creativity": float(
-                re.search(r"Creativity: (\d+(\.\d+)?)/10", evaluation_text).group(1)
-            ),
-            "consistency": float(
-                re.search(r"Consistency: (\d+(\.\d+)?)/10", evaluation_text).group(1)
-            ),
-            "plot": float(
-                re.search(r"Plot: (\d+(\.\d+)?)/10", evaluation_text).group(1)
-            ),
-            "instruct": float(
-                re.search(r"Instruct: (\d+(\.\d+)?)/10", evaluation_text).group(1)
-            ),
-        }
+        scores["grammar"] = float(re.search(r"Grammar: (\d+(\.\d+)?)/10", evaluation_text).group(1))
+        scores["creativity"] = float(re.search(r"Creativity: (\d+(\.\d+)?)/10", evaluation_text).group(1))
+        scores["consistency"] = float(re.search(r"Consistency: (\d+(\.\d+)?)/10", evaluation_text).group(1))
+        
+        if mode == "instruct":
+            scores["plot"] = float(re.search(r"Plot: (\d+(\.\d+)?)/10", evaluation_text).group(1))
+            scores["instruct"] = float(re.search(r"Instruct: (\d+(\.\d+)?)/10", evaluation_text).group(1))
+            
         return scores
     except AttributeError:
         return None
@@ -266,6 +353,11 @@ def main():
         required=True,
         help="Path to the saved model parameters (.pt file).",
     )
+    # Mode selection
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--basic", action="store_true", help="Use basic evaluation mode (Grammar, Creativity, Consistency). Default.")
+    group.add_argument("--instruct", action="store_true", help="Use instruction-based evaluation mode (Adds Plot, Instruction Following).")
+
     parser.add_argument(
         "--num_prompts",
         type=int,
@@ -299,6 +391,9 @@ def main():
 
     args = parser.parse_args()
 
+    # Determine mode
+    mode = "instruct" if args.instruct else "basic"
+
     # Configure GenAI here
     if "GOOGLE_API_KEY" not in os.environ:
         print("Error: GOOGLE_API_KEY environment variable not set.")
@@ -311,6 +406,7 @@ def main():
     # Print the parameters at the beginning of the script
     print("--- Script Parameters ---")
     print(f"Model Name: {args.model_path}")
+    print(f"Mode: {mode}")
     print(f"Temperature: {args.temperature}")
     print(f"Max Tokens: {args.max_new_tokens}")
     print(f"Top K: {args.top_k}")
@@ -325,11 +421,17 @@ def main():
 
     # Setup logging
     log_filename = (
-        f"evaluation_log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+        f"evaluation_log_{mode}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
     )
     print(f"Logging evaluation details to: {log_filename}")
 
-    prompts_to_use = generate_prompts_with_instructions(args.num_prompts)
+    if mode == "instruct":
+        prompts_to_use = generate_prompts_instruct(args.num_prompts)
+        score_keys = ["grammar", "creativity", "consistency", "plot", "instruct"]
+    else:
+        prompts_to_use = generate_prompts_basic(args.num_prompts)
+        score_keys = ["grammar", "creativity", "consistency"]
+
     if not prompts_to_use:
         print("No prompts were generated. Exiting.")
         return
@@ -360,13 +462,12 @@ def main():
     model.eval()
 
     results = []
-    score_keys = ["grammar", "creativity", "consistency", "plot", "instruct"]
 
     # We loop through the generated prompts
     for i, prompt_data in enumerate(tqdm(prompts_to_use, desc="Evaluating Prompts")):
         prompt_scores = {key: [] for key in score_keys}
 
-        generation_prompt = format_generation_prompt(prompt_data)
+        generation_prompt = format_generation_prompt(prompt_data, mode=mode)
 
         # Generate multiple completions per prompt
         for j in tqdm(
@@ -386,19 +487,20 @@ def main():
 
             completion = completion.replace("<|endoftext|>", "")
 
-            evaluation_text = evaluate_with_gemini(prompt_data, completion)
+            evaluation_text = evaluate_with_gemini(prompt_data, completion, mode=mode)
 
             # Log the details
             with open(log_filename, "a", encoding="utf-8") as f:
                 f.write(f"--- Prompt {i + 1}, Generation {j + 1} ---\n")
-                f.write(f"Instruction Type: {prompt_data['instruction_type']}\n")
-                f.write(f"Instruction Content: {prompt_data['instruction_content']}\n")
+                if mode == "instruct":
+                    f.write(f"Instruction Type: {prompt_data['instruction_type']}\n")
+                    f.write(f"Instruction Content: {prompt_data['instruction_content']}\n")
                 f.write(f"Story Beginning: {prompt_data['story_beginning']}\n")
-                f.write(f"Model Completion:\n{completion.split("***")[-1]}\n")
+                f.write(f"Model Completion:\n{completion.split('***')[-1]}\n")
                 f.write(f"Evaluation:\n{evaluation_text}\n")
                 f.write("-" * 40 + "\n\n")
 
-            scores = parse_evaluation(evaluation_text)
+            scores = parse_evaluation(evaluation_text, mode=mode)
 
             if scores:
                 for key in score_keys:
