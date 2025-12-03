@@ -5,3 +5,6 @@ description = "Building a Gemma model from scratch"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[tool.setuptools]
+packages = ["gemma_scratch"]

@@ -26,7 +26,15 @@ else
 fi
 
 # --- Install common packages ---
-uv pip install -r requirements.txt
+uv pip install \
+    --python "$VENV_NAME/bin/python" \
+    -r requirements.txt
+
+# --- NEW: Install the current project in editable mode ---
+echo "Installing project in editable mode..."
+uv pip install \
+    --python "$VENV_NAME/bin/python" \
+    -e . 
 
 echo ""
 echo "✅ Installation complete."
