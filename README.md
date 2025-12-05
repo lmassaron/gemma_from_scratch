@@ -39,21 +39,29 @@ For better organization and modularity, the project files have been arranged as 
 
 ```
 gemma_from_scratch/
-├── .gitignore
 ├── README.md
 ├── requirements.txt
 │
 ├── prepare_dataset.py      # User-facing script to download and process data
 ├── train.py                # User-facing script to train the model
 │
-└── gemma_scratch/            # Core source code as a Python package
-    ├── __init__.py         # Makes 'gemma_scratch' a package
-    ├── config.py           # Model hyperparameters
-    ├── layers.py           # The TransformerBlock implementation
-    ├── model.py            # The Gemma model definition
-    ├── normalization.py    # RMSNorm implementation
-    ├── rope.py             # RoPE (Rotary Positional Embeddings) implementation
-    └── tokenizer.py        # Tokenizer utilities
+├── gemma_scratch/            # Core source code as a Python package
+│   ├── __init__.py         # Makes 'gemma_scratch' a package
+│   ├── config.py           # Model hyperparameters
+│   ├── layers.py           # The TransformerBlock implementation
+│   ├── model.py            # The Gemma model definition
+│   ├── normalization.py    # RMSNorm implementation
+│   ├── rope.py             # RoPE (Rotary Positional Embeddings) implementation
+│   └── tokenizer.py        # Tokenizer utilities
+├── evals/                    # Scripts and utilities for model evaluation
+│   ├── EVAL.md             # Documentation for evaluation
+│   └── evaluate_model.py   # Script to evaluate the trained model
+└── utils/                    # Utility scripts for various tasks
+    ├── count_parameters.py       # Script to count model parameters
+    ├── count_tokens.py           # Script to count tokens in a dataset
+    ├── generate_model_summary.py # Script to generate a model summary
+    ├── GPU_performance_benchmark.py # Script for GPU performance benchmarking
+    └── model_summary.txt         # Placeholder for model summary output
 ```
 
 ## Setup
