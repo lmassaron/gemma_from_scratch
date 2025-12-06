@@ -345,6 +345,13 @@ def main(args):
                 best_iter_num = iter_num + 1
                 torch.save(model.state_dict(), best_model_params_path)
 
+        # Save a checkpoint every 1 million iterations
+        if (iter_num + 1) % 1_000_000 == 0:
+            millions = (iter_num + 1) // 1_000_000
+            checkpoint_path = os.path.join(models_dir, f"model_{timestamp}@{millions}M.pt")
+            torch.save(model.state_dict(), checkpoint_path)
+            print(f"\nSaved periodic checkpoint to {checkpoint_path}")
+
     writer.close()
     end_time = time.time()  # Stop the timer
     training_duration = end_time - start_time
