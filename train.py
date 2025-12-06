@@ -142,6 +142,27 @@ def main(args):
 
     # --- Model and Optimizer ---
     model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
+
+    # Load checkpoint if specified
+    if args.resume_from:
+        if os.path.exists(args.resume_from):
+            print(f"Loading weights from checkpoint: {args.resume_from}")
+            checkpoint = torch.load(args.resume_from, map_location=device, weights_only=True)
+            
+            # Fix the keys if the model has been compiled (remove "_orig_mod." prefix)
+            state_dict = {}
+            for key, value in checkpoint.items():
+                if key.startswith("_orig_mod."):
+                    new_key = key.replace("_orig_mod.", "")
+                    state_dict[new_key] = value
+                else:
+                    state_dict[key] = value
+            
+            model.load_state_dict(state_dict)
+        else:
+            print(f"Checkpoint file not found: {args.resume_from}")
+            return
+
     model.to(device)
 
     # Compile the model
@@ -410,6 +431,12 @@ if __name__ == "__main__":
         type=int,
         default=10,
         help="How often to log training metrics.",
+    )
+    parser.add_argument(
+        "--resume_from",
+        type=str,
+        default=None,
+        help="Path to a checkpoint file to load model weights from.",
     )
 
     args = parser.parse_args()
