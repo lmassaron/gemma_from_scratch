@@ -232,7 +232,6 @@ class Gemma3Model(nn.Module):
 
             # 4. Check for EOS (Stop generation)
             if eos_id is not None and idx_next.item() == eos_id:
-                print("[EOS]")
                 break
 
         return idx
