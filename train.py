@@ -411,10 +411,10 @@ if __name__ == "__main__":
     # Model and data parameters
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size.")
     parser.add_argument(
-        "--sequence_length",
+        "--block_size",
         type=int,
         default=128,
-        help="Context window length (block size).",
+        help="Block sequence lenght.",
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
