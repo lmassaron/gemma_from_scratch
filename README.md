@@ -97,9 +97,9 @@ This script downloads a dataset from the Hugging Face Hub, tokenizes it using a 
 
 *   **To use a different dataset from the Hub and a custom output directory:**
     ```bash
-    python prepare_dataset.py <huggingface_dataset_name> --output_dir ./data
+    python prepare_dataset.py <huggingface_dataset_name> --output-dir ./data
     ```
-    For example: `python prepare_dataset.py "c4" --data_subset "en.noblocklist" --output_dir ./c4_data`
+    For example: `python prepare_dataset.py "c4" --data-subset "en.noblocklist" --output-dir ./c4_data`
 
 ### Step 2: Train the Model
 
@@ -112,9 +112,9 @@ Once the dataset is prepared, you can start training the model. This script hand
     ```
 
 *   **To point the training script to a custom data directory:**
-    *(This is required if you used the `--output_dir` option when preparing the data)*
+    *(This is required if you used the `--output-dir` option when preparing the data)*
     ```bash
-    python train.py --data_dir ./data
+    python train.py --data-dir ./data
     ```
 
 The training script will save the following outputs in the root directory:
@@ -153,7 +153,7 @@ This repository provides two main scripts for running inference:
 *   **`inference_custom.py`**: This script is for running inference with a custom model. It requires a `.pth` file with the model weights. You can use this script to test your own trained models.
 
     ```bash
-    python inference_custom.py --pth_path /path/to/your/model.pth
+    python inference_custom.py --model-path /path/to/your/model.pth
     ```
 
 Both scripts will output the generated text to the console.

@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
     # Data arguments
     parser.add_argument(
-        "--data_dir",
+        "--data-dir",
         type=str,
         default="./tinystories_data",
         help="Directory with train.bin and val.bin.",
@@ -145,37 +145,37 @@ if __name__ == "__main__":
 
     # Training hyperparameters
     parser.add_argument(
-        "--learning_rate", type=float, default=1e-4, help="Max learning rate."
+        "--learning-rate", type=float, default=1e-4, help="Max learning rate."
     )
     parser.add_argument(
-        "--min_lr",
+        "--min-lr",
         type=float,
         default=5e-5,
         help="Minimum learning rate for cosine decay.",
     )
     parser.add_argument(
-        "--max_iters",
+        "--max-iters",
         type=int,
         default=150_000,
         help="Total training iterations. Set to -1 to run for exactly one epoch.",
     )
     parser.add_argument(
-        "--warmup_steps", type=int, default=1000, help="Number of warmup steps."
+        "--warmup-steps", type=int, default=1000, help="Number of warmup steps."
     )
     parser.add_argument(
         "--seed", type=int, default=0, help="Random seed for reproducibility."
     )
 
     # Model and data parameters
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size.")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size.")
     parser.add_argument(
-        "--block_size",
+        "--block-size",
         type=int,
         default=128,
         help="Block sequence lenght.",
     )
     parser.add_argument(
-        "--gradient_accumulation_steps",
+        "--gradient-accumulation-steps",
         type=int,
         default=32,
         help="Steps to accumulate gradients.",
@@ -183,22 +183,22 @@ if __name__ == "__main__":
 
     # Evaluation parameters
     parser.add_argument(
-        "--eval_interval", type=int, default=500, help="How often to run evaluation."
+        "--eval-interval", type=int, default=500, help="How often to run evaluation."
     )
     parser.add_argument(
-        "--eval_iters",
+        "--eval-iters",
         type=int,
         default=200,
         help="Number of iterations for evaluation.",
     )
     parser.add_argument(
-        "--log_interval",
+        "--log-interval",
         type=int,
         default=10,
         help="How often to log training metrics.",
     )
     parser.add_argument(
-        "--resume_from",
+        "--resume-from",
         type=str,
         default=None,
         help="Path to a checkpoint file to load model weights from.",

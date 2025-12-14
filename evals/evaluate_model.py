@@ -348,7 +348,7 @@ def main():
         description="Evaluate a trained Gemma model using Gemini."
     )
     parser.add_argument(
-        "--model_path",
+        "--model-path",
         type=str,
         required=True,
         help="Path to the saved model parameters (.pt file).",
@@ -359,13 +359,13 @@ def main():
     group.add_argument("--instruct", action="store_true", help="Use instruction-based evaluation mode (Adds Plot, Instruction Following).")
 
     parser.add_argument(
-        "--num_prompts",
+        "--num-prompts",
         type=int,
         default=50,
         help="Number of prompts with instructions to generate for the evaluation. Default: 50.",
     )
     parser.add_argument(
-        "--max_new_tokens",
+        "--max-new-tokens",
         type=int,
         default=4096,
         help="Maximum number of new tokens to generate.",
@@ -377,7 +377,7 @@ def main():
         help="Controls randomness for generation.",
     )
     parser.add_argument(
-        "--top_k",
+        "--top-k",
         type=int,
         default=None,
         help="Sample from the top K most likely tokens.",

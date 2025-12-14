@@ -33,14 +33,14 @@ if __name__ == "__main__":
         description="Generate text using a trained Gemma model."
     )
     parser.add_argument(
-        "--model_path",
+        "--model-path",
         nargs="?",
         type=str,
         default="./models/best_model_params_01.pt",
         help="Path to the saved model parameters (.pt file). Defaults to './models/best_model_params_01.pt'.",
     )
     parser.add_argument(
-        "--max_new_tokens",
+        "--max-new-tokens",
         type=int,
         default=200,
         help="Maximum number of new tokens to generate.",
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         help="Controls randomness. Lower is more deterministic.",
     )
     parser.add_argument(
-        "--top_k",
+        "--top-k",
         type=int,
         default=None,
         help="Sample from the top K most likely tokens.",

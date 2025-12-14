@@ -49,32 +49,31 @@ You need to set your Google API key as an environment variable.
 export GOOGLE_API_KEY='your_google_api_key_here'
 ```
 
-### 3. Execute the Script
+## Usage
 
-Run the script from your terminal. You must specify the path to your trained model.
+To run the evaluation, you need a trained model checkpoint (e.g., `best_model_params.pt`) and a Google Cloud API Key with access to Gemini (set as the `GOOGLE_API_KEY` environment variable).
 
-**Default Usage (generates 50 prompts):**
-
-```bash
-python evaluate_model.py --model_path ./models/your_model.pt
-```
-
-**Generating a Custom Number of Prompts:**
-
-To generate a different number of prompts for the evaluation, use the `--num_prompts` argument.
+**Basic Evaluation (Default):**
 
 ```bash
-python evaluate_model.py --model_path ./models/your_model.pt --num_prompts 20
+python evaluate_model.py --model-path ./models/your_model.pt
 ```
 
-### 4. Command-Line Arguments
+**Instruction-Based Evaluation:**
 
--   `--model_path` (str): **Required.** Path to the saved model parameters (`.pt` file).
--   `--num_prompts` (int): The number of evaluation prompts (with instructions) to generate using the Gemini API. Default: `50`.
--   `--max_new_tokens` (int): Maximum number of new tokens to generate for each completion. Default: `200`.
--   `--temperature` (float): Controls the randomness of the generation. Higher values (e.g., `1.0`) produce more random text, while lower values (e.g., `0.2`) are more deterministic. Default: `1.0`.
--   `--top_k` (int): Samples from the top K most likely tokens at each step. Default: `None`.
--   `--seed` (int): A fixed random seed for reproducibility. Default: `42`.
+To generate a different number of prompts for the evaluation, use the `--num-prompts` argument.
+
+```bash
+python evaluate_model.py --model-path ./models/your_model.pt --num-prompts 20
+```
+
+### Arguments
+
+-   `--model-path` (str): **Required.** Path to the saved model parameters (`.pt` file).
+-   `--num-prompts` (int): The number of evaluation prompts (with instructions) to generate using the Gemini API. Default: `50`.
+-   `--max-new_tokens` (int): Maximum number of new tokens to generate for each completion. Default: `200`.
+-   `--temperature` (float): Controls the randomness of the generation. Lower values make it more deterministic. Default: `1.0`.
+-   `--top-k` (int): Samples from the top K most likely tokens at each step. Default: `None`.
 
 ## Output
 

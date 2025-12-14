@@ -84,7 +84,7 @@ if __name__ == "__main__":
         help="The name of the dataset to load from the Hugging Face Hub.",
     )
     parser.add_argument(
-        "--output_dir",
+        "--output-dir",
         type=str,
         default="./tinystories_data",
         help="The directory to save the output files.",

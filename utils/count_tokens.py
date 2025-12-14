@@ -32,19 +32,19 @@ def count_tokens(data_dir, batch_size, sequence_length):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Count tokens in a dataset.")
     parser.add_argument(
-        "--data_dir",
+        "--data-dir",
         type=str,
         default="./tinystories_data",
         help="Directory with train.bin and val.bin.",
     )
     parser.add_argument(
-        "--batch_size",
+        "--batch-size",
         type=int,
         default=32,
         help="Batch size.",
     )
     parser.add_argument(
-        "--sequence_length",
+        "--sequence-length",
         type=int,
         default=128,
         help="Context window length (block size).",
