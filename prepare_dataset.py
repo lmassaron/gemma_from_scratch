@@ -52,6 +52,7 @@ def prepare_data(dataset_name, output_dir="."):
             arr_len = np.sum(dset["len"], dtype=np.uint64)
             if split == "validation":
                 split = "val"
+            print(f"Tokenizing {split} split - containing {arr_len} total tokens")
             filename = os.path.join(output_dir, f"{split}.bin")
             # (can do since enc.max_token_value == 50256 is < 2**16)
             dtype = np.uint16

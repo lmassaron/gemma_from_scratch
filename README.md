@@ -42,8 +42,10 @@ gemma_from_scratch/
 ├── README.md
 ├── requirements.txt
 │
-├── prepare_dataset.py      # User-facing script to download and process data
-├── train.py                # User-facing script to train the model
+├── prepare_dataset.py           # User-facing script to download and process data
+├── train.py                     # User-facing script to train the model
+├── inference_custom.py          # Test the inference capabilities of your custom model
+├── inference_google_gemma.py    # Test the inference capabilities of the original Gemma 270M
 │
 ├── gemma_scratch/            # Core source code as a Python package
 │   ├── __init__.py         # Makes 'gemma_scratch' a package
@@ -126,7 +128,7 @@ The training script will save the following outputs in the root directory:
 *   **`train.py`**: The main training loop. It implements modern training best practices:
     *   **Mixed-Precision Training:** Uses `torch.amp.autocast` with `bfloat16` for faster training and reduced memory usage on supported hardware.
     *   **Optimizer:** Employs the AdamW optimizer, which adds weight decay for better regularization.
-    *   **Learning Rate Scheduler:** Uses a `SequentialLR` scheduler that combines a linear warmup phase with a cosine annealing decay, helping to stabilize training.
+    *   **Learning Rate Scheduler:** Uses a `SequentialLR` scheduler that combines a linear warmup phase with a cosine decay, helping to stabilize training.
     *   **Gradient Accumulation:** Allows for training with large effective batch sizes even on memory-constrained GPUs.
     *   **Gradient Clipping:** Prevents exploding gradients by clipping the norm of the gradients before the optimizer step.
 
