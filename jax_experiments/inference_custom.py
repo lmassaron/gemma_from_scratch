@@ -4,6 +4,7 @@ Inference script for JAX/Flax Gemma model.
 
 import argparse
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3" # Suppress verbose TF/XLA logs
 import time
 
 import jax
@@ -38,49 +39,48 @@ def generate(
     print(f"Generating for: '{sentence}'")
     # Tokenize
     input_ids = tokenizer.encode_ordinary(sentence)
-    input_ids = jnp.array([input_ids], dtype=jnp.int32) # (1, seq_len) 
+    initial_len = len(input_ids)
+    
+    # We use a fixed buffer size to enable JIT compilation
+    # Total capacity = initial + max_new
+    # We round up to a nice power of 2 or just use a sufficiently large buffer
+    MAX_LEN = 2048 
+    if initial_len + max_new_tokens > MAX_LEN:
+        print(f"Warning: Sequence length ({initial_len + max_new_tokens}) exceeds buffer ({MAX_LEN}). Truncating generation.")
+        max_new_tokens = MAX_LEN - initial_len
+
+    # Prepare buffer
+    # Initialize with zeros (padding)
+    buffer = np.zeros((1, MAX_LEN), dtype=np.int32)
+    buffer[0, :initial_len] = input_ids
     
     rng = jax.random.PRNGKey(seed) 
     
-    # Generation loop
-    cur_ids = input_ids
-    
-    # We can JIT the single step for performance
+    # JIT-compiled forward function for the fixed shape
     @jax.jit
-    def next_token_step(params, ids, rng_key):
-        # Crop context if needed within the model call or here?
-        # Ideally we pass the last `context_length` tokens.
-        ctx_len = GEMMA3_CONFIG_CUSTOM["context_length"]
-        # JAX array slicing must be static or handled carefully in JIT.
-        # Since shapes change, we might re-compile every step if we JIT the whole thing with dynamic shape.
-        # For this simple inference, we might NOT JIT the outer loop logic, 
-        # but JIT the model forward pass with a fixed size or just accept recompilation (slow).
-        # Better: use a fixed window size for the model call if possible, or just eager execution for simplicity.
-        # Eager execution for variable length inference is often acceptable for debugging/small scale.
-        
-        # Let's just JIT the model apply for the current shape. 
-        # Since shape changes every step (+1 token), it will recompile every step.
-        # To avoid this, we usually use padding and `jax.lax.scan` or a `kv_cache`.
-        # For "from scratch" simplicity without kv-cache:
-        # We will just run eager or accept the overhead.
-        
-        logits = model.apply({'params': params}, ids)
-        next_token_logits = logits[:, -1, :]
-        return next_token_logits
+    def forward_pass(params, ids):
+        # ids shape: (1, MAX_LEN)
+        return model.apply({'params': params}, ids)
 
+    current_len = initial_len
+    
+    # Generation loop
     for _ in range(max_new_tokens):
-        # Crop context
-        ctx_len = GEMMA3_CONFIG_CUSTOM["context_length"]
-        if cur_ids.shape[1] > ctx_len:
-            cond_ids = cur_ids[:, -ctx_len:]
-        else:
-            cond_ids = cur_ids
-
-        # Forward pass
-        # We use the model.apply directly without JIT to avoid recompilation spam on dynamic shapes
-        # unless we pad. For this demo, raw apply is fine.
-        logits = model.apply({'params': params}, cond_ids)
-        next_token_logits = logits[:, -1, :]
+        # We pass the full buffer. The model's causal mask prevents 
+        # attending to the padding (future) tokens, so the valid tokens 
+        # are processed correctly.
+        
+        # Note: We must ensure we don't pass garbage in the "future" slots 
+        # if the model happened to be bidirectional, but Gemma is causal.
+        # Zeros are fine.
+        
+        input_jax = jnp.array(buffer)
+        
+        logits = forward_pass(params, input_jax)
+        
+        # Extract logits for the last VALID token
+        # logits shape: (1, MAX_LEN, vocab)
+        next_token_logits = logits[0, current_len - 1, :]
         
         # Temperature
         if temperature == 0.0:
@@ -88,35 +88,34 @@ def generate(
         else:
             next_token_logits = next_token_logits / temperature
             
-            # Top-k (Simple NumPy-based implementation for CPU/MPS inference efficiency without complex JAX ops)
+            # Top-k sampling
             if top_k is not None:
-                # Convert to numpy for flexible indexing
+                # We do top-k on CPU (numpy) to avoid dynamic shapes/sort on GPU if desired,
+                # but for single token it's fast enough on GPU usually. 
+                # However, to match previous logic and keep it simple:
                 logits_np = np.array(next_token_logits)
-                # For each batch item (here 1) 
-                for i in range(logits_np.shape[0]):
-                    row = logits_np[i]
-                    # Find top k
-                    ind = np.argpartition(row, -top_k)[-top_k:]
-                    # Set others to -inf
-                    mask = np.ones_like(row, dtype=bool)
-                    mask[ind] = False
-                    row[mask] = -np.inf
-                    logits_np[i] = row
+                ind = np.argpartition(logits_np, -top_k)[-top_k:]
+                mask = np.ones_like(logits_np, dtype=bool)
+                mask[ind] = False
+                logits_np[mask] = -np.inf
                 next_token_logits = jnp.array(logits_np)
 
             # Sampling
             rng, key = jax.random.split(rng)
             next_token = jax.random.categorical(key, next_token_logits, axis=-1)
         
-        next_token = next_token[:, None]
-        cur_ids = jnp.concatenate([cur_ids, next_token], axis=1)
+        # Update buffer
+        token_id = int(next_token)
+        if current_len < MAX_LEN:
+            buffer[0, current_len] = token_id
+            current_len += 1
         
         # Check EOS
-        if tokenizer.eot_token is not None and next_token[0,0] == tokenizer.eot_token:
+        if tokenizer.eot_token is not None and token_id == tokenizer.eot_token:
             break
             
-    # Decode
-    output_ids = cur_ids[0].tolist()
+    # Decode only the valid part
+    output_ids = buffer[0, :current_len].tolist()
     return tokenizer.decode(output_ids)
 
 

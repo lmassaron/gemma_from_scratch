@@ -5,6 +5,7 @@ This script provides a comprehensive training pipeline for a Gemma-like model us
 """
 
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3" # Suppress verbose TF/XLA logs
 import argparse
 from datetime import datetime
 from itertools import cycle
@@ -19,6 +20,7 @@ import jax.numpy as jnp
 from flax import linen as nn
 from flax.training import train_state
 import optax
+from flax import serialization # Added import
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -44,11 +46,11 @@ class MemmapDataset(Dataset):
         y = self.data[idx + 1 : idx + 1 + self.sequence_length].astype(np.int64)
         return np.array(x), np.array(y) # Return numpy arrays for JAX
 
-def create_train_state(rng, config, learning_rate_fn):
+def create_train_state(rng, config, learning_rate_fn, sequence_length):
     """Creates initial `TrainState`."""
     model = Gemma3Model(config)
     # Initialize parameters
-    dummy_input = jnp.ones((1, config["context_length"]), dtype=jnp.int32)
+    dummy_input = jnp.ones((1, sequence_length), dtype=jnp.int32)
     params = model.init(rng, dummy_input)["params"]
     
     # Optimizer
@@ -97,19 +99,22 @@ def train_step(state, batch, accumulation_steps):
 
     grad_fn = jax.value_and_grad(micro_batch_loss_fn)
 
-    def accumulate_grads(carry, micro_batch):
-        # accumulated gradients are not passed in carry for simple scan, 
-        # we compute them and sum later.
+    def accumulate_grads(accum_grads, micro_batch):
         loss, grads = grad_fn(state.params, micro_batch)
-        return None, (loss, grads)
+        new_accum_grads = jax.tree.map(lambda x, y: x + y, accum_grads, grads)
+        return new_accum_grads, loss
+
+    # Initialize accumulated gradients with zeros
+    init_accum_grads = jax.tree.map(jnp.zeros_like, state.params)
 
     # inputs shape: (accum_steps, micro_batch, seq)
     # Scan over the first dimension (accum_steps)
-    _, (losses, grads) = jax.lax.scan(accumulate_grads, None, (inputs, targets))
+    final_accum_grads, losses = jax.lax.scan(accumulate_grads, init_accum_grads, (inputs, targets))
     
     # Average gradients and loss
     loss = jnp.mean(losses)
-    grads = jax.tree.map(lambda x: jnp.mean(x, axis=0), grads)
+    # Normalize gradients by accumulation steps
+    grads = jax.tree.map(lambda x: x / accumulation_steps, final_accum_grads)
     
     new_state = state.apply_gradients(grads=grads)
     return new_state, loss
@@ -174,17 +179,27 @@ def main(args):
     num_optimizer_steps = args.max_iters // args.gradient_accumulation_steps
     warmup_optimizer_steps = args.warmup_steps // args.gradient_accumulation_steps
     
+    # Ensure valid decay_steps (total steps must be > warmup steps)
+    if num_optimizer_steps <= warmup_optimizer_steps:
+        print(f"Warning: max_iters ({args.max_iters}) is less than or equal to warmup_steps ({args.warmup_steps}). Adjusting schedule to warmup-only.")
+        warmup_optimizer_steps = num_optimizer_steps - 1 # Ensure strictly less than total if possible, or just accept short warmup
+        # Actually, if we want "warmup only" or "warmup then flat", we just need valid args.
+        # If we set decay_steps = num_optimizer_steps, and warmup = num, then decay duration is 0.
+        # optax might require decay_duration > 0.
+        # Let's set num_optimizer_steps = warmup + 1
+        num_optimizer_steps = warmup_optimizer_steps + 1
+
     lr_schedule = optax.warmup_cosine_decay_schedule(
         init_value=0.0,
         peak_value=args.learning_rate,
         warmup_steps=warmup_optimizer_steps,
-        decay_steps=num_optimizer_steps - warmup_optimizer_steps,
+        decay_steps=num_optimizer_steps,
         end_value=args.min_lr
     )
 
     # Initialize model
     rng, init_rng = jax.random.split(rng)
-    state = create_train_state(init_rng, GEMMA3_CONFIG_CUSTOM, lr_schedule)
+    state = create_train_state(init_rng, GEMMA3_CONFIG_CUSTOM, lr_schedule, args.sequence_length)
     
     print(f"Model initialized. Params count: {sum(x.size for x in jax.tree_util.tree_leaves(state.params))}")
 
@@ -296,11 +311,17 @@ def main(args):
                 best_iter_num = current_iter
                 # Saving JAX checkpoint (simplified)
                 with open(best_model_params_path, 'wb') as f:
-                     f.write(jax.serialization.to_bytes(state.params))
+                     f.write(serialization.to_bytes(state.params))
 
     writer.close()
     print(f"Training completed in {time.time() - start_time:.2f}s")
     print(f"Best model saved at {best_model_params_path}")
+
+    # Save final model parameters
+    final_model_params_path = os.path.join(models_dir, f"final_model_jax_{timestamp}.params")
+    with open(final_model_params_path, 'wb') as f:
+        f.write(serialization.to_bytes(state.params))
+    print(f"Final model saved at {final_model_params_path}")
 
     # Plot
     plt.plot(train_loss_list, "g", label="train_loss")
@@ -335,4 +356,10 @@ if __name__ == "__main__":
         iters_for_one_epoch = num_possible_sequences // args.batch_size
         args.max_iters = iters_for_one_epoch
         
+    import multiprocessing
+    try:
+        multiprocessing.set_start_method('spawn')
+    except RuntimeError:
+        pass # Context already set
+
     main(args)
