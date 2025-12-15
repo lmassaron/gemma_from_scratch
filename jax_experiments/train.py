@@ -24,7 +24,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from jax.config import config
+from jax_experiments.config import GEMMA3_CONFIG_CUSTOM
 from .model import Gemma3Model
 from .config import GEMMA3_CONFIG_CUSTOM
 
@@ -48,7 +48,7 @@ def create_train_state(rng, config, learning_rate_fn):
     """Creates initial `TrainState`."""
     model = Gemma3Model(config)
     # Initialize parameters
-    dummy_input = jnp.ones((1, config["context_length"])), dtype=jnp.int32)
+    dummy_input = jnp.ones((1, config["context_length"]), dtype=jnp.int32)
     params = model.init(rng, dummy_input)["params"]
     
     # Optimizer
@@ -109,7 +109,7 @@ def train_step(state, batch, accumulation_steps):
     
     # Average gradients and loss
     loss = jnp.mean(losses)
-    grads = jax.tree_map(lambda x: jnp.mean(x, axis=0), grads)
+    grads = jax.tree.map(lambda x: jnp.mean(x, axis=0), grads)
     
     new_state = state.apply_gradients(grads=grads)
     return new_state, loss
@@ -159,6 +159,7 @@ def numpy_collate(batch):
         return np.array(batch)
 
 def main(args):
+    print(f"JAX Devices: {jax.devices()}")
     # Setup
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     models_dir = "models"
