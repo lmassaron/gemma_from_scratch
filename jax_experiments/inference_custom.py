@@ -30,7 +30,11 @@ enc = tiktoken.get_encoding("gpt2")
 def load_pytorch_weights(path, jax_params):
     import torch
     print(f"Loading PyTorch weights from {path}...")
-    state_dict = torch.load(path, map_location="cpu")
+    try:
+        state_dict = torch.load(path, map_location="cpu", weights_only=True)
+    except Exception as e:
+        print(f"Warning: Failed to load with weights_only=True ({e}). Retrying with weights_only=False.")
+        state_dict = torch.load(path, map_location="cpu", weights_only=False)
 
     # Normalize keys: remove _orig_mod. prefix if present
     # This handles checkpoints from torch.compile()
@@ -346,5 +350,5 @@ if __name__ == "__main__":
         )
         end = time.time()
         print(f"Generated output:\n{generated}")
-        print(f"Time taken: {end - start:.2f}s")
+        print(f"/nTime taken: {end - start:.2f}s")
         print(f"{'-' * 64}\n")
