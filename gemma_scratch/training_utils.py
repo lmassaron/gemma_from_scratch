@@ -3,14 +3,18 @@ import torch
 import matplotlib.pyplot as plt
 from contextlib import nullcontext
 
+
 def set_seed(seed):
     torch.manual_seed(seed)
+
 
 def load_checkpoint(model, resume_from_path, device):
     if os.path.exists(resume_from_path):
         print(f"Loading weights from checkpoint: {resume_from_path}")
-        checkpoint = torch.load(resume_from_path, map_location=device, weights_only=True)
-        
+        checkpoint = torch.load(
+            resume_from_path, map_location=device, weights_only=True
+        )
+
         state_dict = {}
         for key, value in checkpoint.items():
             if key.startswith("_orig_mod."):
@@ -18,7 +22,7 @@ def load_checkpoint(model, resume_from_path, device):
                 state_dict[new_key] = value
             else:
                 state_dict[key] = value
-        
+
         model.load_state_dict(state_dict)
         return True
     else:
@@ -55,8 +59,9 @@ def get_device_settings():
 
     # GradScaler is only needed for float16
     scaler = torch.amp.GradScaler(enabled=(dtype == "float16"))
-    
+
     return device, dtype, ctx, scaler
+
 
 def plot_loss_curves(train_loss_list, validation_loss_list, timestamp, eval_interval):
     plt.plot(train_loss_list, "g", label="train_loss")

@@ -20,7 +20,12 @@ from gemma_scratch.model import Gemma3Model
 from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
 from gemma_scratch.dataset import MemmapDataset
 from gemma_scratch.trainer import GemmaTrainer
-from gemma_scratch.training_utils import set_seed, get_device_settings, plot_loss_curves, load_checkpoint
+from gemma_scratch.training_utils import (
+    set_seed,
+    get_device_settings,
+    plot_loss_curves,
+    load_checkpoint,
+)
 
 
 def main(args):
@@ -205,7 +210,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    
+
     # Fix for sequence_length not being explicitly in arguments but used
     args.sequence_length = args.block_size
 

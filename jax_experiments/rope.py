@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 
+
 def compute_rope_params(
     head_dim: int,
     theta_base: int = 10_000,
@@ -16,10 +17,7 @@ def compute_rope_params(
     # 1. Compute the inverse frequencies for the rotations.
     inv_freq = 1.0 / (
         theta_base
-        ** (
-            jnp.arange(0, head_dim, 2, dtype=dtype)[: (head_dim // 2)]
-            / head_dim
-        )
+        ** (jnp.arange(0, head_dim, 2, dtype=dtype)[: (head_dim // 2)] / head_dim)
     )
 
     # 2. Generate position indices.
@@ -52,11 +50,11 @@ def apply_rope(x: jnp.ndarray, cos: jnp.ndarray, sin: jnp.ndarray) -> jnp.ndarra
     # 2. Adjust the shapes of sin and cos for broadcasting.
     # Expected x shape: (batch, heads, seq_len, head_dim)
     # cos/sin shape: (seq_len, head_dim) -> (1, 1, seq_len, head_dim)
-    
+
     # Slice to current sequence length if needed (though usually we pass sliced cos/sin)
     # But for safety in JAX (static shapes usually), we assume inputs are correct size
     # or we handle slicing outside. Here we assume x matches seq_len or we rely on broadcasting.
-    
+
     # We slice cos/sin to match x's seq_len
     cos = cos[:seq_len, :][None, None, :, :]
     sin = sin[:seq_len, :][None, None, :, :]

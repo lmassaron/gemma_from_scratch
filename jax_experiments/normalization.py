@@ -4,10 +4,12 @@ import jax
 import jax.numpy as jnp
 from flax import linen as nn
 
+
 class RMSNorm(nn.Module):
     """
     Root Mean Square Normalization (RMSNorm) layer.
     """
+
     emb_dim: int
     eps: float = 1e-6
     bias: bool = False
@@ -16,10 +18,14 @@ class RMSNorm(nn.Module):
     def setup(self):
         # 'scale' is the learnable multiplicative parameter.
         # Initialized to zeros as per original implementation (1 + scale).
-        self.scale = self.param('scale', nn.initializers.zeros, (self.emb_dim,), jnp.float32)
+        self.scale = self.param(
+            "scale", nn.initializers.zeros, (self.emb_dim,), jnp.float32
+        )
 
         if self.bias:
-            self.shift = self.param('shift', nn.initializers.zeros, (self.emb_dim,), jnp.float32)
+            self.shift = self.param(
+                "shift", nn.initializers.zeros, (self.emb_dim,), jnp.float32
+            )
         else:
             self.shift = None
 
@@ -39,7 +45,7 @@ class RMSNorm(nn.Module):
         # 3. Apply the learnable scale and optional shift.
         # The (1 + self.scale) formulation.
         out = x_norm * (1.0 + self.scale)
-        
+
         if self.shift is not None:
             out = out + self.shift
 

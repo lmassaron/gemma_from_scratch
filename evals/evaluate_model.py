@@ -169,6 +169,7 @@ Creativity: [score]/10
 Consistency: [score]/10
 """
 
+
 def generate_prompts_instruct(num_prompts):
     """Generates a set of prompts, each with a randomly assigned instruction."""
     print(f"Generating {num_prompts} prompts with instructions using Gemini...")
@@ -230,6 +231,7 @@ def generate_prompts_instruct(num_prompts):
 
     return prompts
 
+
 def generate_prompts_basic(num_prompts):
     """Generates a set of basic story beginnings."""
     print(f"Generating {num_prompts} basic story beginnings using Gemini...")
@@ -242,7 +244,7 @@ def generate_prompts_basic(num_prompts):
             story_beginning = response.text.strip()
             # Ensure it ends with ***
             if not story_beginning.endswith("***"):
-                 story_beginning += "***"
+                story_beginning += "***"
         except Exception as e:
             tqdm.write(
                 f"    Warning: Error generating story beginning ({e}). Skipping."
@@ -268,10 +270,10 @@ def format_generation_prompt(prompt_data, mode="instruct"):
             f"Here is the beginning of the story:\n"
             f"{prompt_data['story_beginning']}"
         )
-    else: # Basic mode
+    else:  # Basic mode
         # User requested: "present to the gemma model the beginning of the story... followed by ***"
         # The story_beginning already contains *** from generation
-        return prompt_data['story_beginning']
+        return prompt_data["story_beginning"]
 
 
 def generate(
@@ -304,7 +306,7 @@ def generate(
 def evaluate_with_gemini(prompt_data, model_completion, mode="instruct"):
     """Evaluates the model's completion using the Gemini API."""
     model = genai.GenerativeModel(GEMINI_EVALUATION_MODEL)
-    
+
     if mode == "instruct":
         prompt = EVALUATION_PROMPT_TEMPLATE_INSTRUCT.format(
             instruction_type=prompt_data["instruction_type"],
@@ -312,8 +314,8 @@ def evaluate_with_gemini(prompt_data, model_completion, mode="instruct"):
             story_beginning=prompt_data["story_beginning"],
             model_completion=model_completion,
         )
-    else: # Basic
-         prompt = EVALUATION_PROMPT_TEMPLATE_BASIC.format(
+    else:  # Basic
+        prompt = EVALUATION_PROMPT_TEMPLATE_BASIC.format(
             story_beginning=prompt_data["story_beginning"],
             model_completion=model_completion,
         )
@@ -329,14 +331,24 @@ def parse_evaluation(evaluation_text, mode="instruct"):
     """Parses the evaluation text from Gemini to extract scores."""
     scores = {}
     try:
-        scores["grammar"] = float(re.search(r"Grammar: (\d+(\.\d+)?)/10", evaluation_text).group(1))
-        scores["creativity"] = float(re.search(r"Creativity: (\d+(\.\d+)?)/10", evaluation_text).group(1))
-        scores["consistency"] = float(re.search(r"Consistency: (\d+(\.\d+)?)/10", evaluation_text).group(1))
-        
+        scores["grammar"] = float(
+            re.search(r"Grammar: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+        )
+        scores["creativity"] = float(
+            re.search(r"Creativity: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+        )
+        scores["consistency"] = float(
+            re.search(r"Consistency: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+        )
+
         if mode == "instruct":
-            scores["plot"] = float(re.search(r"Plot: (\d+(\.\d+)?)/10", evaluation_text).group(1))
-            scores["instruct"] = float(re.search(r"Instruct: (\d+(\.\d+)?)/10", evaluation_text).group(1))
-            
+            scores["plot"] = float(
+                re.search(r"Plot: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+            )
+            scores["instruct"] = float(
+                re.search(r"Instruct: (\d+(\.\d+)?)/10", evaluation_text).group(1)
+            )
+
         return scores
     except AttributeError:
         return None
@@ -355,8 +367,16 @@ def main():
     )
     # Mode selection
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--basic", action="store_true", help="Use basic evaluation mode (Grammar, Creativity, Consistency). Default.")
-    group.add_argument("--instruct", action="store_true", help="Use instruction-based evaluation mode (Adds Plot, Instruction Following).")
+    group.add_argument(
+        "--basic",
+        action="store_true",
+        help="Use basic evaluation mode (Grammar, Creativity, Consistency). Default.",
+    )
+    group.add_argument(
+        "--instruct",
+        action="store_true",
+        help="Use instruction-based evaluation mode (Adds Plot, Instruction Following).",
+    )
 
     parser.add_argument(
         "--num-prompts",
@@ -420,9 +440,7 @@ def main():
         torch.cuda.manual_seed_all(args.seed)
 
     # Setup logging
-    log_filename = (
-        f"evaluation_log_{mode}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
-    )
+    log_filename = f"evaluation_log_{mode}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
     print(f"Logging evaluation details to: {log_filename}")
 
     if mode == "instruct":
@@ -494,7 +512,9 @@ def main():
                 f.write(f"--- Prompt {i + 1}, Generation {j + 1} ---\n")
                 if mode == "instruct":
                     f.write(f"Instruction Type: {prompt_data['instruction_type']}\n")
-                    f.write(f"Instruction Content: {prompt_data['instruction_content']}\n")
+                    f.write(
+                        f"Instruction Content: {prompt_data['instruction_content']}\n"
+                    )
                 f.write(f"Story Beginning: {prompt_data['story_beginning']}\n")
                 f.write(f"Model Completion:\n{completion.split('***')[-1]}\n")
                 f.write(f"Evaluation:\n{evaluation_text}\n")

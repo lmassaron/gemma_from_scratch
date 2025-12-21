@@ -8,10 +8,12 @@ from .layers import TransformerBlock
 from .normalization import RMSNorm
 from .rope import compute_rope_params
 
+
 class Gemma3Model(nn.Module):
     """
     The main Gemma3 model class in JAX/Flax.
     """
+
     cfg: dict
 
     def setup(self):
@@ -23,15 +25,17 @@ class Gemma3Model(nn.Module):
         self.tok_emb = nn.Embed(
             num_embeddings=self.cfg["vocab_size"],
             features=self.cfg["emb_dim"],
-            dtype=self.cfg["dtype"]
+            dtype=self.cfg["dtype"],
         )
 
         self.blocks = [
-            TransformerBlock(self.cfg, attn_type, name=f'block_{i}') 
+            TransformerBlock(self.cfg, attn_type, name=f"block_{i}")
             for i, attn_type in enumerate(self.cfg["layer_types"])
         ]
 
-        self.final_norm = RMSNorm(self.cfg["emb_dim"], eps=1e-6, dtype=self.cfg["dtype"])
+        self.final_norm = RMSNorm(
+            self.cfg["emb_dim"], eps=1e-6, dtype=self.cfg["dtype"]
+        )
         self.out_head = nn.Dense(
             self.cfg["vocab_size"], use_bias=False, dtype=self.cfg["dtype"]
         )
@@ -43,9 +47,9 @@ class Gemma3Model(nn.Module):
         # But for RoPE params which are smallish (context_len * head_dim), it's fine.
         # Ideally, we should use `self.variable` with `cache` collection for immutable constants,
         # but recalculating them or passing them is also fine.
-        # To match the PyTorch style where they are part of the model state (buffers), 
+        # To match the PyTorch style where they are part of the model state (buffers),
         # we can put them in a variable collection.
-        
+
         self.cos_local, self.sin_local = compute_rope_params(
             head_dim=self.cfg["head_dim"],
             theta_base=self.cfg["rope_local_base"],
@@ -61,9 +65,9 @@ class Gemma3Model(nn.Module):
 
     def _create_masks(self, seq_len):
         ones = jnp.ones((seq_len, seq_len), dtype=bool)
-        
+
         # Global mask (causal)
-        # jnp.triu gives upper triangle. 
+        # jnp.triu gives upper triangle.
         # PyTorch: triu(ones, diagonal=1) -> upper triangle excluding diagonal.
         # Mask means "masked out" (True).
         # In PyTorch code: mask_global = torch.triu(ones, diagonal=1)
@@ -74,9 +78,9 @@ class Gemma3Model(nn.Module):
         # far_past = torch.triu(ones, diagonal=window).T
         # jnp.triu(..., k=window).T
         far_past = jnp.triu(ones, k=self.cfg["sliding_window"]).T
-        
+
         mask_local = mask_global | far_past
-        
+
         return mask_global, mask_local
 
     def __call__(self, input_ids, training=False):
@@ -86,7 +90,7 @@ class Gemma3Model(nn.Module):
         x = self.tok_emb(input_ids) * (self.cfg["emb_dim"] ** 0.5)
 
         mask_global, mask_local = self._create_masks(seq_len)
-        
+
         # Expand masks for broadcasting over batch and heads
         # (1, 1, seq_len, seq_len)
         mask_global = mask_global[None, None, :, :]

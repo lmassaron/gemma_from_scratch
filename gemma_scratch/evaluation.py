@@ -1,6 +1,7 @@
 import math
 import torch
 
+
 def evaluate_model(model, eval_iters, ctx, iterators, device):
     """Calculates loss, perplexity, and accuracy for train and validation splits."""
     metrics = {}

@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+
 class MemmapDataset(Dataset):
     """A PyTorch Dataset that loads sequences from a memory-mapped .bin file."""
 
