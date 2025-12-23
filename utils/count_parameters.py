@@ -1,5 +1,6 @@
 from gemma_scratch.model import Gemma3Model
-from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM
+from gemma_scratch.config import GEMMA3_CONFIG_CUSTOM, create_gemma_config
+import torch
 
 
 def count_parameters(module):
@@ -122,7 +123,30 @@ def print_parameter_breakdown(model):
 
 
 if __name__ == "__main__":
-    gemma_model = Gemma3Model(GEMMA3_CONFIG_CUSTOM)
+    gemma_config = create_gemma_config(
+        # Architecture Dimensions
+        vocab_size=50_257,
+        context_length=32_768 // 8,
+        emb_dim=640 // 2,
+        n_heads=4,
+        hidden_dim=2048 // 2,
+        head_dim=256 // 2,
+        n_kv_groups=1,
+        # Layer & Attention Configuration
+        n_layers=9,
+        sliding_layers_per_block=2,
+        full_layers_per_block=1,
+        sliding_window=512,
+        # RoPE & Normalization
+        rope_local_base=10_000.0,
+        rope_base=1_000_000.0,
+        qk_norm=True,
+        query_pre_attn_scalar=256,
+        # System
+        dtype=torch.bfloat16,
+    )
+
+    gemma_model = Gemma3Model(gemma_config)
     gemma_model.out_head.weight = (
         gemma_model.tok_emb.weight
     )  # Ensure weight tying for accurate count
