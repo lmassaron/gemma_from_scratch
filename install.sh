@@ -41,14 +41,22 @@ else
         echo "Detected CUDA version: $CUDA_VERSION"
         
         # Map CUDA version to PyTorch wheel index
-        # PyTorch currently supports cu118, cu121, cu124
+        # PyTorch currently supports cu118, cu121, cu124, cu126, cu130, cu132
         CUDA_MAJOR=$(echo $CUDA_VERSION | cut -d. -f1)
         CUDA_MINOR=$(echo $CUDA_VERSION | cut -d. -f2)
         
-        if [ "$CUDA_MAJOR" -ge 13 ]; then
-            CUDA_TAG="cu124" # Use latest stable supported by PyTorch
+        if [ "$CUDA_MAJOR" -ge 14 ]; then
+            CUDA_TAG="cu132" # Use latest known stable
+        elif [ "$CUDA_MAJOR" -eq 13 ]; then
+            if [ "$CUDA_MINOR" -ge 2 ]; then
+                CUDA_TAG="cu132"
+            else
+                CUDA_TAG="cu130"
+            fi
         elif [ "$CUDA_MAJOR" -eq 12 ]; then
-            if [ "$CUDA_MINOR" -ge 4 ]; then
+            if [ "$CUDA_MINOR" -ge 6 ]; then
+                CUDA_TAG="cu126"
+            elif [ "$CUDA_MINOR" -ge 4 ]; then
                 CUDA_TAG="cu124"
             else
                 CUDA_TAG="cu121"
